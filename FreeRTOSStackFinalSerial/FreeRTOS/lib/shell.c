@@ -139,7 +139,7 @@ static int paramCount = 0;
             break;
         case 1:            
             sprintf(pcWriteBuffer,"IP ADDRESS  : %d.%d.%d.%d\r\n",8,8,8,8); 
-            xReturn = pdPASS;
+            xReturn = pdFALSE;
             paramCount++;
             break;
         default:
