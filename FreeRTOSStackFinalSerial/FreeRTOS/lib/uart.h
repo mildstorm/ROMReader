@@ -354,6 +354,13 @@ extern void uart1_init(uint16_t baudrate);
 /** @brief  Get received byte of USART1 from ringbuffer. (only available on selected ATmega) @see uart_getc */
 extern uint16_t uart1_getc(void);
 
+/**
+ * Called from the USART1 RX ISR after a byte is stored in the ring buffer.
+ * The hook runs in interrupt context.
+ */
+typedef void (*uart1_rx_hook_t)(void);
+extern void uart1_set_rx_hook(uart1_rx_hook_t hook);
+
 /** @brief  Peek at next byte in USART1 ringbuffer */
 extern uint16_t uart1_peek(void);
 

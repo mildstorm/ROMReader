@@ -12,46 +12,80 @@
 #include "lib/lcd.h"
 #include "lib/uart.h"
 
-#define GET_XRAM(addr) (*(volatile unsigned char *)(addr))
-#define SET_XRAM(addr, data) ((*(volatile unsigned char *)(addr)) = data)
+/* AB-M128Pro-A 4-digit, common cathode. PORTA is the segment pattern
+ * (bit0=a .. bit6=g). PC0-PC3 select digits 0-3, active low.
+ * Those pins are also the external SRAM bus, so the bus stays off. */
+static const uint8_t seg_font[10] = {
+	0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x27, 0x7F, 0x67
+};
 
-void XMEM_init(void) __attribute__ ((naked)) __attribute__ ((section(".init1")));
-
-void XMEM_init(void) 
+static void seg_init(void)
 {
-	// External memory interface enable
-	MCUCR |= (1<<SRE);
-	XMCRA = 0;
-	//PC7..PC5 released pins
-	XMCRB |= (1<<XMM1)|(1<<XMM0);
+	DDRA = 0xFF;
+	PORTA = 0x00;
+	/* PC7 is the SRAM /CS. Hold it high so the chip stays off the bus. */
+	DDRC |= 0x8F;
+	PORTC |= 0x8F;
+}
+
+static void seg_show(uint8_t pos, uint8_t pattern)
+{
+	PORTC |= 0x0F;
+	PORTA = pattern;
+	PORTC = (uint8_t)((PORTC | 0x8F) & ~(1u << pos));
 }
 
 #define LED_TASK_PRIORITY (tskIDLE_PRIORITY + 5)
 #define SHELL_TASK_PRIORITY (tskIDLE_PRIORITY + 4)
+#define SEG_TASK_PRIORITY (tskIDLE_PRIORITY + 6)
 
 void taskLED(void *pvParameters)
-{	
-	// https://mansfield-devine.com/speculatrix/2017/04/avr-basics-reading-and-writing-gpio-pins/
-    DDRE |= (1 << DDE6);   
-	DDRE |= (1 << DDE7);   
-    while(1) 
+{
+	/* AB-M128Pro-A LEDs are PG0 and PG1, on when the pin is high.
+	 * PC7 stays high, so the external SRAM stays disabled. */
+	(void)pvParameters;
+	DDRG |= (1 << DDG0) | (1 << DDG1);
+	PORTG &= (uint8_t)~((1 << PG0) | (1 << PG1));
+	while(1)
 	{
-		{
-			//char message[20] = {0, };
-			//sprintf(message, "toggling %s", "led");
-			//printf("%s\n\r", message);
-		}
-		
-		PORTE ^= (1 << PE6); // Toggle bit
+		PORTG ^= (1 << PG0);
 		vTaskDelay(250);
-		PORTE ^= (1 << PE7); // Toggle bit		
-	    vTaskDelay(250);
-    }
+		PORTG ^= (1 << PG1);
+		vTaskDelay(250);
+	}
+}
+
+static void taskSeg(void *pvParameters)
+{
+	uint16_t value = 0;
+	uint8_t digits[4] = { 0, 0, 0, 0 };
+	uint8_t pos = 0;
+	uint16_t ticks = 0;
+
+	(void)pvParameters;
+	for (;;) {
+		seg_show(pos, seg_font[digits[pos]]);
+		pos = (uint8_t)((pos + 1u) & 3u);
+		if (++ticks >= 1000u) {
+			uint16_t next = (uint16_t)(value + 1u);
+
+			ticks = 0;
+			if (next > 9999u)
+				next = 0;
+			value = next;
+			digits[0] = (uint8_t)(value / 1000u);
+			digits[1] = (uint8_t)((value / 100u) % 10u);
+			digits[2] = (uint8_t)((value / 10u) % 10u);
+			digits[3] = (uint8_t)(value % 10u);
+		}
+		vTaskDelay(1);
+	}
 }
 
 void deviceInit(void)
 {
-	uartInit();	
+	uartInit();
+	seg_init();
 }
 
 // https://www.digikey.com/en/maker/projects/introduction-to-rtos-solution-to-part-7-freertos-semaphore-example/51aa8660524c4daba38cba7c2f5baba7
@@ -72,7 +106,14 @@ int main(void)
 		configMINIMAL_STACK_SIZE,
 		NULL,
 		SHELL_TASK_PRIORITY,
-		NULL);		
+		NULL);
+
+    xTaskCreate(taskSeg,
+		(const char *)"SEG",
+		configMINIMAL_STACK_SIZE,
+		NULL,
+		SEG_TASK_PRIORITY,
+		NULL);
 
     vTaskStartScheduler();	
     

@@ -19,16 +19,15 @@ static SemaphoreHandle_t xTxMutex = NULL;
 
 #if ( configAPPLICATION_ALLOCATED_HEAP == 1 )
 
-/* The application writer has already defined the array used for the RTOS
-* heap - probably so it can be placed in a special segment or address. */
-uint8_t __attribute__((section (".myBufSection"))) ucHeap[ configTOTAL_HEAP_SIZE ];
+/* Internal SRAM. The 7-segment uses the external memory pins. */
+uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 
 #endif
 
-QueueHandle_t __attribute__((section (".myBufSection"))) FreeRTOS_ShellRecvQueue;
-static uint8_t __attribute__((section (".myBufSection"))) inputBuffer[FREERTOS_SHELL_INPUT_BUFFER_LENGTH];
-static uint8_t __attribute__((section (".myBufSection"))) *inputBuffer_ptr;
-static uint8_t __attribute__((section (".myBufSection"))) outputBuffer[FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE];
+QueueHandle_t FreeRTOS_ShellRecvQueue = NULL;
+static uint8_t inputBuffer[FREERTOS_SHELL_INPUT_BUFFER_LENGTH];
+static uint8_t *inputBuffer_ptr;
+static uint8_t outputBuffer[FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE];
 
 int USART1_putc(char data, FILE *stream)
 {
@@ -45,9 +44,24 @@ static FILE usart_stdout = FDEV_SETUP_STREAM(USART1_putc, NULL, _FDEV_SETUP_WRIT
 static FILE usart_stdin = FDEV_SETUP_STREAM(NULL, USART1_getc, _FDEV_SETUP_READ);
 static FILE usart_stdio = FDEV_SETUP_STREAM(USART1_putc, USART1_getc, _FDEV_SETUP_RW);
 
+static void Shell_UartRxFromISR(void)
+{
+	uint16_t token = 1;
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+	if( (FreeRTOS_ShellRecvQueue != NULL) &&
+		(uxQueueMessagesWaitingFromISR(FreeRTOS_ShellRecvQueue) == 0) )
+	{
+		(void) xQueueSendFromISR(FreeRTOS_ShellRecvQueue, &token, &xHigherPriorityTaskWoken);
+	}
+}
+
 void uartInit(void)
 {		
 	#define UART_BAUD_RATE 9600
+	FreeRTOS_ShellRecvQueue = xQueueCreate(FREERTOS_SHELL_RECV_QUEUE_LENGTH, sizeof(uint16_t));
+	configASSERT(FreeRTOS_ShellRecvQueue != NULL);
+	uart1_set_rx_hook(Shell_UartRxFromISR);
 	uart_init(UART_BAUD_SELECT(UART_BAUD_RATE, F_CPU));
 	
 	stdout = (FILE *)&usart_stdout;
@@ -73,21 +87,55 @@ void vOutputString( const uint8_t* const pcMessage, int length )
 	}
 }
 
-const char __attribute__((section (".myBufSection"))) *welcome = "Hello world! Waiting for input ...\r\n";
-
 #define FREERTOS_SHELL_START_LOGO \
-"___________                    _____________________________    _________         \r\n"\
-"\\_   _____/______   ____   ____\\______   \\__    ___/\\_____  \\  /   _____/    \r\n"\
-" |    __) \\_  __ \\_/ __ \\_/ __ \\|       _/ |    |    /   |   \\ \\_____  \\   \r\n"\
-" |     \\   |  | \\/\\  ___/\\  ___/|    |   \\ |    |   /    |    \\/        \\  \r\n"\
-" \\___  /   |__|    \\___  >\\___  >____|_  / |____|   \\_______  /_______  /     \r\n"\
-"     \\/                \\/     \\/       \\/                   \\/        \\/    \r\n"\
-"           _________.__           .__  .__                 \r\n"\
-"          /   _____/|  |__   ____ |  | |  |                \r\n"\
-"  ______  \\_____  \\ |  |  \\_/ __ \\|  | |  |            \r\n"\
-" /_____/  /        \\|   Y  \\  ___/|  |_|  |__            \r\n"\
-"         /_______  /|___|  /\\___  >____/____/             \r\n"\
-"                 \\/      \\/     \\/                      \r\n"\
+"\r\n"\
+"                           ,,\r\n"\
+"... ,;;, .......  ...  . .;++,..........   .  ..  ............................\r\n"\
+"....:;++: ............. .;;+;:....... ..        .............   ....  ........\r\n"\
+"....::*+;:............ .;;**::. .... ........   ....  ..............  ........\r\n"\
+"... ,:+#;+:   ..  .....;++#+,:............  ........  ........................\r\n"\
+"... ,:;##;;;,,.......,;;;*#;::..........  .,,,,,,.............................\r\n"\
+"... .;;+*+;+;:,,:::,,;+;+*+,;:   .... ..,,::::,,:,............................\r\n"\
+".....;;;##+:;,,:,,;:,;;:+#*:+: .... ..,,:;::,,::,,,.,,.. .....................\r\n"\
+".... :***;+;:,,;,,;::;;;++*++. .. ..,,,,::,::;;;,:,,:.,;,.....................\r\n"\
+".... .+;:*%++:.;:,:.:++*+;::+,  .,,,,.,,:..:;;+:,.:;:,,,;,.... ...............\r\n"\
+".... ,+,*%+++;,;::;,++++**+,+, .:,.,,.... ,.:::::.,;;;, ::,...................\r\n"\
+"......:+%;;+*+,+;++,+*++;+#;:,,:,.:,,,:::.. ,::;;:.,;;,.,;;:..................\r\n"\
+"...... +*;;:+;;+;++:;+;;;;+;,:,,,,,   ,::,...;::;;,.,;:,:,,:.,,...............\r\n"\
+".. ...;++++,*,#+,:#+:*,;;;+++::..,.,  ..;;,:..::;;,,,:;,;,.;:,................\r\n"\
+"...  .;##+*+#:#+::#*;*+*+;#*+::, ..:,....;:::.:,:+;,,.;,;;.::,:. .............\r\n"\
+"...  ,;*;;;;+**+*#+*++;;;:*;::,,.,:,::,. ,;,:,,.,++,,.:;,;:.,:++:,,...........\r\n"\
+".... ,;,:%++,+%*%%+%;:+*%;.::;,..,::.::,..;:;::,.:+;,.:+:,,::,:+++;,..........\r\n"\
+".... .:,+%%*+;%##+#*;+*@%+:..,,,,,:;,:;:,:++;;;:.,++, :+,.,;;;:;:+;;,.........\r\n"\
+".......::;*#%*+****;*%%*::;;:,,::::;:,;*;,:**+;;:::+;.:,,,:;+**+,;;;;,........\r\n"\
+". ....,#*:;+#*.*@#;,%*;::++#++::;,:;:.,++,,+*+;;;;:;;,;::.:+**+;,;;,:;. ......\r\n"\
+". ..,,,+;:;;;:,*@%:,;+::;;+;::::;,:;;:,:;;,;;+*+;;;:+;::;::++++,:;:,,;:.......\r\n"\
+".  .. .,,;;++#;;%#,*#+;:;;::;:::+,:;;;:.;;.,;,;**+;,+;,,;,:;+;;;;;,,,;:.......\r\n"\
+"..    .,;;+*+#%:*;+@*+**+;:;,::+:,;;,;:,:,:.,::+**+,;;.,;:;:;;;;++:..::, .....\r\n"\
+"..  .,,,;++%%#@%;+@@#%@#*;+;:::+,;+:,;;;,.:,.,.:**+,:;,,;,;;,:;;++; .,:,......\r\n"\
+"...,,.  .;*#%%@@;#@@%%@###+:;;+::+;:,;+;,:,,, .:;++:::,,;,:;..:;++;,:::,......\r\n"\
+"....  .:::+#***+:;++*##%#+;;:;;;;+::;,+;::.,,. ,;+;;:;,,;,:;. ;+;:++,,;:......\r\n"\
+"... .,,,,.,;+;;+**++;+++;+*;,+;;:+,;+,;,,;.,,,..;::;::.,;,::.,++,,;;::::......\r\n"\
+"....,,,..,.,;+++++;::;++*#+:*;:;;;,**,: ,;..:,.,;::;:;,.:::,.;+::,,;;:,.......\r\n"\
+"....... ,...:+;;;;;+*##%@#::+;;;;;:++,,.,*;.;:.,:::+;;..:::,:;,,,.:+;:,.......\r\n"\
+"...  . ,. . .;*++++*%%%%#;,+;:+;:;+;,:;+::::;,,;,,:+;;,.,,,;;:,,:;;::..,......\r\n"\
+".......,    .:##*###%%@@*,;;:;;;;;:,;+;;:::;:.:,.:;;;+;,,,,::,,,:;:::.........\r\n"\
+"........ .   .;%@@%#%@%*::*::;;;;:,;;,,...:,.::.,;;:;;;;,,.,::,:,,,:,.........\r\n"\
+"....... ......,+%@%%%%+,:+;:;:;;:,;:,:::::, ,::::,::;;;:,,:::,,:::....... ....\r\n"\
+"........... ...;+%%##+:;+;:;:;;,,:,:++;::,..:,.,::,.;+;,,,:,,:::,,::.,........\r\n"\
+"...............;#%#+++++::+::;:,,.,;;:.,...,::,:,:, :;::::,,::;;;;:,.., ......\r\n"\
+"......... .. ...+#%%#+;;;;:,;::;::,,,.:,.,:,::;;::, ::,,:::::::,,...:.,,,.....\r\n"\
+"............ ...,;*##+::::,,,::;+;,,,,:;,,;+;.::::. ,,::::::,:,::,,.:.:;:, ...\r\n"\
+"...........  .. .,;;;;;:,,,,::::::;;+;:::;;;,,:,,,,,.,::::;:.. .,::,,,;;:. ...\r\n"\
+"....  ..        ..,:;++;::,;;,:,.,:,:::;;+;;::::,,,,,::;;;:,. ...,,,,::,,,. ..\r\n"\
+"...... .. ..      .,:;+;;::;;;:;;:::,:;++;;;;;:::::::::;::;;;:,,,,;,.,:,:%*...\r\n"\
+"............ .. ,+*:,.,:::;;:;+++;::;:;++;::;;,:;;;;+++:..,;++;.:.,:,.,,:#*...\r\n"\
+"................*@#*;,.,,;:,::;+;:,::::;;:::,:++::,.,;++;. .:+;....,,. .... ..\r\n"\
+".............. :@%#@#:,#%%*:;++;,...,,::.... :+:;;:  .;+;....;,.  .  .... ....\r\n"\
+".............. ,#*###+*@@@%%#*+;.   . .      ,::;;, ...:: ....  ...... .......\r\n"\
+"............... ,::::+@#@%#@@@#, .    .  .. ...,;;. ....... ..................\r\n"\
+"................   . ,**@%#@@#;... ......... .. .......... .....  ............\r\n"\
+"..................... .,*;:*;, .................  ............................\r\n"\
 "\r\n"
 #define FREERTOS_SHELL_USER_INFO "[root@FreeRTOS]# "
 
@@ -107,10 +155,28 @@ static BaseType_t prvSetNetworkConfigCommand( char *pcWriteBuffer, size_t xWrite
 	configASSERT( pcWriteBuffer );
 
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
-    strncat(ip, pcParameter, xParameterStringLength);    
+    if( pcParameter != NULL )
+    {
+        size_t n = (size_t) xParameterStringLength;
+        if( n >= sizeof(ip) )
+        {
+            n = sizeof(ip) - 1U;
+        }
+        memcpy(ip, pcParameter, n);
+        ip[n] = '\0';
+    }
 
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    strncat(subnet, pcParameter, xParameterStringLength);    
+    if( pcParameter != NULL )
+    {
+        size_t n = (size_t) xParameterStringLength;
+        if( n >= sizeof(subnet) )
+        {
+            n = sizeof(subnet) - 1U;
+        }
+        memcpy(subnet, pcParameter, n);
+        subnet[n] = '\0';
+    }    
     
     sprintf(pcWriteBuffer,"Network Setting Done\r\n"); 
     
@@ -176,103 +242,113 @@ void vRegisterCLICommands(void)
 
 void taskFreeRTOSShell(void *pvParameters)
 {
-	uint8_t recvChar = 0;		
-	uint16_t checkChar = 0;		
+	uint8_t recvChar = 0;
+	uint16_t checkChar = 0;
+	uint8_t lastWasCr = 0;
 	int pass = 0;
 	
 	/* Create the semaphore used to access the UART Tx. */
 	xTxMutex = xSemaphoreCreateMutex();
 	configASSERT( xTxMutex );
-		
-	FreeRTOS_ShellRecvQueue = xQueueCreate(FREERTOS_SHELL_RECV_QUEUE_LENGTH, sizeof(uint16_t));
+	configASSERT( FreeRTOS_ShellRecvQueue != NULL );
+
 	uart_puts_P(FREERTOS_SHELL_START_LOGO);
 	uart_puts_P(FREERTOS_SHELL_USER_INFO);
 	
 	vRegisterCLICommands();
-	
+	memset(inputBuffer, 0, FREERTOS_SHELL_INPUT_BUFFER_LENGTH);
+	inputBuffer_ptr = inputBuffer;
+
 	while(1) 
 	{
-		/* always wait a queue */		 
-		checkChar = uart1_getc();
-		recvChar = checkChar & 0xff;
-		pass = 0;
+		uint16_t token;
 
-		if (checkChar & UART_NO_DATA)
-		{			
-		}
-		else
+		if( xQueueReceive(FreeRTOS_ShellRecvQueue, &token, portMAX_DELAY) != pdPASS )
 		{
-			if (checkChar & UART_FRAME_ERROR)
-			{				
+			continue;
+		}
+		(void) token;
+
+		for( ;; )
+		{
+			int isInputBufferEmpty;
+			int lineOver;
+
+			checkChar = uart1_getc();
+			if( checkChar & UART_NO_DATA )
+			{
+				break;
 			}
-			else if (checkChar & UART_OVERRUN_ERROR)
-			{	
+
+			recvChar = (uint8_t) checkChar;
+			if( (recvChar == '\n') && lastWasCr )
+			{
+				lastWasCr = 0;
+				continue;
 			}
-			else if (checkChar & UART_BUFFER_OVERFLOW)
-			{			
+			lastWasCr = (recvChar == '\r');
+
+			pass = 0;
+			if( checkChar & (UART_FRAME_ERROR | UART_OVERRUN_ERROR | UART_BUFFER_OVERFLOW) )
+			{
 			}
 			else
-			{		
-				pass = 1;		
+			{
+				pass = 1;
 			}
-		}		
-		
-		if (pass)
-		{
-			if( xSemaphoreTake( xTxMutex, cmdMAX_MUTEX_WAIT ) == pdPASS )
-			{				
-				int lineOver = 0;
-				int isInputBufferEmpty = (inputBuffer_ptr == inputBuffer);				
-		
-				if(recvChar == 13)
-				{
-					lineOver = 1;
-				}
-				
-				if(lineOver) 
+
+			if( !pass )
+			{
+				continue;
+			}
+
+			if( xSemaphoreTake( xTxMutex, cmdMAX_MUTEX_WAIT ) != pdPASS )
+			{
+				continue;
+			}
+
+			isInputBufferEmpty = (inputBuffer_ptr == inputBuffer);
+			lineOver = (recvChar == '\r') || (recvChar == '\n');
+
+			if( lineOver )
+			{
+				FreeRTOS_ShellOutput((const uint8_t *)"\r\n", 2);
+				if( !isInputBufferEmpty )
 				{
 					BaseType_t ret = pdTRUE;
-					//FreeRTOS_ShellOutput((const uint8_t *)"\r", 1);					
-			
-					if(!isInputBufferEmpty) 
+
+					while( ret == pdTRUE )
 					{
-						while (ret == pdTRUE) 
-						{
-							ret = FreeRTOS_CLIProcessCommand((const char*)inputBuffer, (char*)outputBuffer, FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE);
-							FreeRTOS_ShellOutput((const uint8_t *)outputBuffer, strlen((const char*)outputBuffer));							
-						}
-						memset(outputBuffer,0,FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE);
-						memset(inputBuffer,0,FREERTOS_SHELL_INPUT_BUFFER_LENGTH);
-						inputBuffer_ptr = inputBuffer;
+						ret = FreeRTOS_CLIProcessCommand((const char*)inputBuffer, (char*)outputBuffer, FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE);
+						FreeRTOS_ShellOutput((const uint8_t *)outputBuffer, strlen((const char*)outputBuffer));
 					}
-					FreeRTOS_ShellOutput((const uint8_t *)FREERTOS_SHELL_USER_INFO, strlen(FREERTOS_SHELL_USER_INFO));					
+					memset(outputBuffer, 0, FREERTOS_CLI_OUTPUT_MAX_BUFFER_SIZE);
+					memset(inputBuffer, 0, FREERTOS_SHELL_INPUT_BUFFER_LENGTH);
+					inputBuffer_ptr = inputBuffer;
 				}
-				else if (!lineOver) 
-				{
-					/* backspace */
-					if(recvChar == 0x7f && isInputBufferEmpty) 
-					{						
-					}
-					/* backspace*/
-					else if(recvChar == 0x7f && !isInputBufferEmpty) 
-					{
-						*--inputBuffer_ptr = 0;
-						FreeRTOS_ShellOutput(&recvChar, 1);
-					}
-					/* tab */
-					/* TODO: when double click tab, trigger auto complete */
-					else if(recvChar == 0x08) 
-					{						
-					}
-					else 
-					{
-						*inputBuffer_ptr++ = recvChar;
-						FreeRTOS_ShellOutput(&recvChar, 1);
-					}
-				}	
-				
-				xSemaphoreGive( xTxMutex );
+				FreeRTOS_ShellOutput((const uint8_t *)FREERTOS_SHELL_USER_INFO, strlen(FREERTOS_SHELL_USER_INFO));
 			}
+			else if( (recvChar == 0x08) || (recvChar == 0x7f) )
+			{
+				if( !isInputBufferEmpty )
+				{
+					static const uint8_t eraseSeq[] = "\b \b";
+
+					*--inputBuffer_ptr = '\0';
+					FreeRTOS_ShellOutput(eraseSeq, 3);
+				}
+			}
+			else if( recvChar == '\t' )
+			{
+			}
+			else if( inputBuffer_ptr < (inputBuffer + FREERTOS_SHELL_INPUT_BUFFER_LENGTH - 1) )
+			{
+				*inputBuffer_ptr++ = recvChar;
+				*inputBuffer_ptr = '\0';
+				FreeRTOS_ShellOutput(&recvChar, 1);
+			}
+
+			xSemaphoreGive( xTxMutex );
 		}
 	}
 }

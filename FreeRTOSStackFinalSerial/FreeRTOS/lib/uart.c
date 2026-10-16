@@ -809,6 +809,13 @@ void uart0_flush(void)
  */
 #if defined(ATMEGA_USART1)
 
+static uart1_rx_hook_t uart1_rx_hook;
+
+void uart1_set_rx_hook(uart1_rx_hook_t hook)
+{
+	uart1_rx_hook = hook;
+}
+
 ISR(UART1_RECEIVE_INTERRUPT)
 /*************************************************************************
 Function: UART1 Receive Complete interrupt
@@ -840,7 +847,11 @@ Purpose:  called when the UART1 has received a character
 		UART1_RxBuf[tmphead] = data;
 	}
 	
-	UART1_LastRxError = lastRxError;		
+	UART1_LastRxError = lastRxError;
+	if( uart1_rx_hook != 0 )
+	{
+		uart1_rx_hook();
+	}
 }
 
 ISR(UART1_TRANSMIT_INTERRUPT)

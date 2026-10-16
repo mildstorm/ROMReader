@@ -1,0 +1,17 @@
+# Firmware objects, map, and HEX from `make`
+FreeRTOSStackFinalSerial/FreeRTOS/build/
+
+# Local avrdude clone (own .git) and its CMake/Ninja build
+avrdude/
+
+# Machine-local editor settings
+.vscode/
+
+# Scratch extracts and saved web pages
+doc/_extract/
+doc/Downloads/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -41,8 +41,9 @@ your application. */
 /* Memory allocation related definitions. */
 #define configSUPPORT_STATIC_ALLOCATION             0
 #define configSUPPORT_DYNAMIC_ALLOCATION            1
-//#define configTOTAL_HEAP_SIZE                       1024
-#define configTOTAL_HEAP_SIZE 3300
+/* Internal SRAM only. PORTA and PC0-PC3 are the 7-segment, so the
+ * external bus stays disabled and the heap cannot sit in the SRAM. */
+#define configTOTAL_HEAP_SIZE 2048
 #define configAPPLICATION_ALLOCATED_HEAP            1
 #define configSTACK_ALLOCATION_FROM_SEPARATE_HEAP   0
 
