@@ -15,7 +15,7 @@ NewTC **AB-M128Pro-A** 베이스보드 위에 **AM-128RAM** CPU 모듈을 꽂은
 
 모듈을 베이스 소켓에 끝까지 꽂습니다. 모듈 헤더의 XTAL 핀(23, 24)은 오픈이라 베이스의 7.3728 MHz 발진은 쓰지 않고, MCU는 모듈의 16 MHz로 동작합니다. 전원은 베이스의 12 V 어댑터입니다.
 
-외부 SRAM 배선은 다음과 같습니다. 현재 펌웨어는 7세그먼트와 핀이 겹치므로 XMEM을 켜지 않고, PC7(/CS)을 High로 잡아 SRAM을 버스에서 떼어 둡니다.
+외부 SRAM 배선은 다음과 같습니다. `make`(기본값 `BOARD=stacked`)는 7세그먼트와 핀이 겹치므로 XMEM을 켜지 않고, PC7(/CS)을 High로 잡아 SRAM을 버스에서 떼어 둡니다. CPU 모듈만 쓸 때는 `make BOARD=cpu`로 외부 SRAM을 켭니다. 아래 빌드 옵션을 보면 됩니다.
 
 | SRAM | MCU |
 | --- | --- |
@@ -68,15 +68,23 @@ avrdude 8.3 소스는 `avrdude/`에 있고, Windows 빌드 결과는 다음 경�
 
 실행 시 `D:\msys64\ucrt64\bin`이 PATH에 있어야 합니다. libusb, hidapi, libftdi, readline이 여기 있습니다. STK500은 v2, **115200 8N1**, 대상은 `m128`입니다.
 
-펌웨어 빌드 (MSYS2, avr-gcc):
+펌웨어 빌드 (MSYS2, avr-gcc). 보드 구성에 따라 `BOARD`를 고릅니다.
+
+| `BOARD` | 하드웨어 | 동작 |
+| --- | --- | --- |
+| `stacked` (기본) | 베이스 + CPU | 7세그먼트, PG0/PG1 LED, 힙 2048바이트는 내부 SRAM |
+| `cpu` | AM-128RAM만 | 7세그먼트와 LED 없음. 힙 28416바이트(`0x1100`–`0x7FFF`)는 외부 SRAM. 스택과 전역 변수는 내부 SRAM |
+
+`cpu`를 결합된 보드에 쓰면 PORTA, PC, PG0, PG1이 메모리 버스가 되어 7세그먼트와 LED는 멈춥니다. 베이스를 떼면 UART1 핀헤더도 같이 빠지고, 모듈의 RS-232 커넥터만 남습니다.
 
 ```bash
 export PATH=/ucrt64/bin:$PATH
 cd FreeRTOSStackFinalSerial/FreeRTOS
-make
+make                  # BOARD=stacked
+make BOARD=cpu        # CPU 모듈만, 외부 SRAM
 ```
 
-산출물: `FreeRTOSStackFinalSerial/FreeRTOS/build/FreeRTOS.hex`
+산출물: `build/stacked/FreeRTOS.hex`, `build/cpu/FreeRTOS.hex`
 
 플래시 (PowerShell, COM 번호는 장치 관리자 기준):
 
@@ -85,7 +93,7 @@ $env:PATH = "D:\msys64\ucrt64\bin;" + $env:PATH
 & .\avrdude\build-ucrt64\src\avrdude.exe `
   -C .\avrdude\build-ucrt64\src\avrdude.conf `
   -c stk500v2 -P COM10 -b 115200 -p m128 `
-  -U flash:w:FreeRTOSStackFinalSerial\FreeRTOS\build\FreeRTOS.hex:i
+  -U flash:w:FreeRTOSStackFinalSerial\FreeRTOS\build\stacked\FreeRTOS.hex:i
 ```
 
 쓰기가 끝나면 avrdude가 플래시를 다시 읽어 검증합니다. CLI 세션(COM11)은 그대로 두고, 플래시 후 보드를 리셋하면 부팅 로고와 프롬프트가 나옵니다.
@@ -98,7 +106,9 @@ FT232는 별도입니다. FTDI 드라이버가 잡히면 "USB Serial Port"로 �
 
 ## 5. FreeRTOS 구현
 
-클럭 16 MHz, 틱 1 ms (`configTICK_RATE_HZ` 1000). 힙은 내부 SRAM **2048바이트**만 사용합니다. 링커 데이터 영역도 내부 4 KB(`__DATA_REGION_LENGTH__=0x1000`)로 제한합니다. PORTA와 PC0–PC3이 7세그먼트이므로 외부 버스(XMEM)는 꺼 둔 상태입니다. 외부 SRAM과 7세그먼트는 동시에 쓸 수 없습니다.
+클럭 16 MHz, 틱 1 ms (`configTICK_RATE_HZ` 1000). `.data`와 `.bss`는 항상 내부 4 KB(`__DATA_REGION_LENGTH__=0x1000`)에 있습니다. 하드웨어 스택도 내부 SRAM 끝(`0x10FF`)에 있습니다.
+
+`stacked`에서는 힙 2048바이트도 내부 SRAM입니다. PORTA와 PC0–PC3이 7세그먼트이므로 XMEM은 꺼져 있고 PC7은 High입니다. `cpu`에서는 기동 초기에 XMEM을 켭니다. PC7은 `/CS`로 두고 웨이트는 1입니다. FreeRTOS 힙만 `.noinit`으로 `0x1100`에 놓습니다. PG0/PG1은 `/WE`, `/OE`이라 LED로 쓰지 않습니다.
 
 태스크:
 

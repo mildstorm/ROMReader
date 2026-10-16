@@ -41,9 +41,13 @@ your application. */
 /* Memory allocation related definitions. */
 #define configSUPPORT_STATIC_ALLOCATION             0
 #define configSUPPORT_DYNAMIC_ALLOCATION            1
-/* Internal SRAM only. PORTA and PC0-PC3 are the 7-segment, so the
- * external bus stays disabled and the heap cannot sit in the SRAM. */
+/* stacked: internal heap. The 7-segment owns PORTA and PC0-PC3.
+ * cpu (BOARD_CPU_ONLY): heap fills the external window 0x1100-0x7FFF. */
+#if defined(BOARD_CPU_ONLY)
+#define configTOTAL_HEAP_SIZE ( ( size_t ) 0x6F00 )
+#else
 #define configTOTAL_HEAP_SIZE 2048
+#endif
 #define configAPPLICATION_ALLOCATED_HEAP            1
 #define configSTACK_ALLOCATION_FROM_SEPARATE_HEAP   0
 

@@ -19,8 +19,13 @@ static SemaphoreHandle_t xTxMutex = NULL;
 
 #if ( configAPPLICATION_ALLOCATED_HEAP == 1 )
 
+#if defined(BOARD_CPU_ONLY)
+/* External SRAM. crt0 does not clear .noinit. XMEM is on before main. */
+uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__((section(".noinit")));
+#else
 /* Internal SRAM. The 7-segment uses the external memory pins. */
 uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
+#endif
 
 #endif
 

@@ -12,6 +12,19 @@
 #include "lib/lcd.h"
 #include "lib/uart.h"
 
+#define SHELL_TASK_PRIORITY (tskIDLE_PRIORITY + 4)
+
+#if defined(BOARD_CPU_ONLY)
+/* Turn the external bus on after crt0 has copied .data and cleared .bss,
+ * and before main uses the heap. PC7 stays /CS. One wait for the IS62C256-70. */
+void xmem_init(void) __attribute__((naked, used, section(".init3")));
+void xmem_init(void)
+{
+	MCUCR |= (1 << SRE) | (1 << SRW10);
+	XMCRA = 0;
+	XMCRB = 0;
+}
+#else
 /* AB-M128Pro-A 4-digit, common cathode. PORTA is the segment pattern
  * (bit0=a .. bit6=g). PC0-PC3 select digits 0-3, active low.
  * Those pins are also the external SRAM bus, so the bus stays off. */
@@ -36,7 +49,6 @@ static void seg_show(uint8_t pos, uint8_t pattern)
 }
 
 #define LED_TASK_PRIORITY (tskIDLE_PRIORITY + 5)
-#define SHELL_TASK_PRIORITY (tskIDLE_PRIORITY + 4)
 #define SEG_TASK_PRIORITY (tskIDLE_PRIORITY + 6)
 
 void taskLED(void *pvParameters)
@@ -81,11 +93,14 @@ static void taskSeg(void *pvParameters)
 		vTaskDelay(1);
 	}
 }
+#endif
 
 void deviceInit(void)
 {
 	uartInit();
+#if !defined(BOARD_CPU_ONLY)
 	seg_init();
+#endif
 }
 
 // https://www.digikey.com/en/maker/projects/introduction-to-rtos-solution-to-part-7-freertos-semaphore-example/51aa8660524c4daba38cba7c2f5baba7
@@ -93,14 +108,16 @@ void deviceInit(void)
 int main(void)
 {
 	deviceInit();
-	
+
+#if !defined(BOARD_CPU_ONLY)
     xTaskCreate(taskLED,
 		(const char *)"LED",
 		configMINIMAL_STACK_SIZE,
 		NULL,
 		LED_TASK_PRIORITY,
 		NULL);
-   
+#endif
+
     xTaskCreate(taskFreeRTOSShell,
 		(const char *)"SHELL",
 		configMINIMAL_STACK_SIZE,
@@ -108,12 +125,14 @@ int main(void)
 		SHELL_TASK_PRIORITY,
 		NULL);
 
+#if !defined(BOARD_CPU_ONLY)
     xTaskCreate(taskSeg,
 		(const char *)"SEG",
 		configMINIMAL_STACK_SIZE,
 		NULL,
 		SEG_TASK_PRIORITY,
 		NULL);
+#endif
 
     vTaskStartScheduler();	
     
