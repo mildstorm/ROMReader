@@ -2,9 +2,9 @@
 """Dump a ROM through the ATmega128 RomReader firmware (USART1, 38400 8N1).
 
 Example:
-    python tools/romdump.py -p COM11 -t 2764 -o rom/U45_CD8.bin
-    python tools/romdump.py -p COM11 -t 129  -o rom/U50_1.bin
-    python tools/romdump.py -p COM11 -t 123  -o rom/U5_82S123.bin
+    python tools/romdump.py -p COM11 -t 2764 -o rom/HART/U45_CD8.bin
+    python tools/romdump.py -p COM11 -t 129  -o rom/HART/U50_1.bin
+    python tools/romdump.py -p COM11 -t 123  -o rom/HART/U5_82S123.bin
 
 The board must run the firmware built for that chip (RomReader_<chip>.hex);
 the script checks this before reading. The chip is read --reads times

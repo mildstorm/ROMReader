@@ -309,15 +309,15 @@ $env:PATH = "D:\msys64\ucrt64\bin;" + $env:PATH
 3. 덤프합니다. `-t`는 플래시한 펌웨어와 같아야 하며, 다르면 스크립트가 읽지 않고 멈춥니다. 기본으로 두 번 읽어 비교하고, 각 주소도 펌웨어가 세 번씩 읽습니다. 하나라도 다르면 파일을 쓰지 않습니다.
 
 ```powershell
-python tools\romdump.py -p COM11 -t 2764 -o rom\U45_CD8.bin
+python tools\romdump.py -p COM11 -t 2764 -o rom\HART\U45_CD8.bin
 ```
 
 ```powershell
-python tools\romdump.py -p COM11 -t 129 -o rom\U50_1.bin
+python tools\romdump.py -p COM11 -t 129 -o rom\HART\U50_1.bin
 ```
 
 ```powershell
-python tools\romdump.py -p COM11 -t 123 -o rom\U5_82S123.bin
+python tools\romdump.py -p COM11 -t 123 -o rom\HART\U5_82S123.bin
 ```
 
 스크립트는 먼저 `check`를 실행해 칩이 응답하는지 보여 주고, 끝에 크기와 SHA-1을 출력합니다. 이 값을 HART 목록 문서의 결과 표에 옮기면 됩니다. pyserial이 필요합니다(`pip install pyserial`).
@@ -338,12 +338,40 @@ python tools\romdump.py -p COM11 -t 123 -o rom\U5_82S123.bin
 
 ### 4.2 덤프 결과
 
+덤프 파일은 기종별 폴더에 나눠 저장합니다. 보드 사진은 저장소 최상위의 `HART/`, `GODO/`, `Malum/`에 있고, 덤프는 `rom/` 아래 같은 이름의 폴더에 둡니다.
+
+| 폴더 | 기종 |
+| --- | --- |
+| `rom/HART/` | HART 보드 (2764, 82S129, 82S123) |
+| `rom/GODO/` | 고도 애플2 클론 (2764 ×2, 24핀 ×2) |
+| `rom/Malum/` | Malum 애플2 클론 (2732 ×3, 2716 ×1) |
+
+#### HART
+
 | 칩 | 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C/D8 | U45 | 2764 (NEC D2764) | `rom/U45_CD8.bin` | 8192 | `bbd155416f604496a488608ad0bd30d9a5d88e1f` | 2026-11-22, 2회 일치, 불안정 0 |
-| EF5 | U46 | 2764 | `rom/U46_EF5.bin` | 8192 | `ac6e253d22c6d955b5a81942e24a4e00e7233230` | 2026-11-22, 2회 일치, 불안정 0 |
-| VD5 | U65 | 2764 | `rom/U65_VD5.bin` | 8192 | `40fca8ddb3e6f81f69990e842acd5e8bc7b21e24` | 2026-11-22, 2회 일치, 불안정 0 |
-| CHR P4 | U70 | 2764 | `rom/U70_CHRP4.bin` | 8192 | `550150c2902452c539802ad0cfdd4ad75495b76c` | 2026-11-22, 2회 일치, 불안정 0 |
+| C/D8 | U45 | 2764 (NEC D2764) | `rom/HART/U45_CD8.bin` | 8192 | `bbd155416f604496a488608ad0bd30d9a5d88e1f` | 2026-11-22, 2회 일치, 불안정 0 |
+| EF5 | U46 | 2764 | `rom/HART/U46_EF5.bin` | 8192 | `ac6e253d22c6d955b5a81942e24a4e00e7233230` | 2026-11-22, 2회 일치, 불안정 0 |
+| VD5 | U65 | 2764 | `rom/HART/U65_VD5.bin` | 8192 | `40fca8ddb3e6f81f69990e842acd5e8bc7b21e24` | 2026-11-22, 2회 일치, 불안정 0 |
+| CHR P4 | U70 | 2764 | `rom/HART/U70_CHRP4.bin` | 8192 | `550150c2902452c539802ad0cfdd4ad75495b76c` | 2026-11-22, 2회 일치, 불안정 0 |
+
+#### GODO (고도)
+
+| 칩 | 보드 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/D.bin` | | | |
+| E (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/E.bin` | | | |
+| F (VISION+) | ROM-24 | 24핀, 2732 추정 (표시 판독 불가) | `rom/GODO/F.bin` | | | |
+| 9135N | KEY | 2716 (Fujitsu MB8516) | `rom/GODO/KEY.bin` | | | |
+
+#### Malum
+
+| 칩 | 보드 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D0 | ROM 1 (D0) | 2732 추정 | `rom/Malum/D0.bin` | | | |
+| E0 | ROM 3 (E0) | 2732 (TMS 2732JL) | `rom/Malum/E0.bin` | | | |
+| F0 | ROM 5 (F0) | 2732 (TMS 2732JL) | `rom/Malum/F0.bin` | | | |
+| Rom1 | KEY BOARD (ROM 7) | 2716 (NEC D2716D) | `rom/Malum/KEY.bin` | | | |
 
 ### 터미널 명령
 
