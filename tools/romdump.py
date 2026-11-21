@@ -91,7 +91,9 @@ def main():
 
     with serial.Serial(args.port, args.baud, timeout=0.1) as ser:
         ser.reset_input_buffer()
-        ser.write(b"\r")
+        # The firmware ignores an empty line (no new prompt), so sync with a
+        # harmless command instead of a bare CR.
+        ser.write(b"info\r")
         wait_prompt(ser)
 
         # The chip type is fixed in the firmware; refuse if the flashed one
