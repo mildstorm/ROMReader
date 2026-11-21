@@ -21,6 +21,11 @@ button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 svg{display:block;width:100%;height:auto}
 svg text{font-family:inherit;font-size:11px;fill:var(--muted)}
 svg .th{font-size:14px;font-weight:500;fill:var(--text)}
+h2{font-size:18px;font-weight:500;margin:28px 0 6px}
+a{color:var(--accent)}
+figure{margin:0 0 18px}
+figure img{display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--border);background:#fff}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
 ul{margin:16px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
 li{margin:4px 0}
 code{font-size:13px}
@@ -48,6 +53,10 @@ code{font-size:13px}
 
 <svg id="sv" viewBox="0 0 680 570" role="img" aria-label="보드 헤더와 ZIF 소켓 결선"><g id="g"></g><g id="hl"></g></svg>
 
+<h2>ROM 사진과 1번 핀</h2>
+<p>HART 본체 보드 앞면(슬롯이 위)에서 이 종류 칩의 위치와 1번 핀입니다. 사진을 누르면 원본 크기로 열립니다. 보드 전체 배치는 <a href="rom_dump_locations.jpg" target="_blank">rom_dump_locations.jpg</a>에 있습니다.</p>
+<div id="photos"></div>
+
 <ul>
   <li>헤더 칸 <code>3 PB2 · ZIF 8 A2</code> = J117 3번 핀(PB2)을 ZIF 8번 다리에 연결, 칩 신호는 A2.</li>
   <li>ZIF 번호: 레버를 위로 놓고 왼쪽 줄 맨 위가 1번, 왼쪽 줄 아래로 20번, 오른쪽 줄 맨 아래 21번, 맨 위 40번. 칩은 노치를 레버 쪽으로, 위쪽으로 붙여 꽂습니다.</li>
@@ -72,6 +81,19 @@ const W={
 ['J117',1,34,'A0','a'],['J117',2,35,'A1','a'],['J117',3,36,'A2','a'],['J117',4,37,'A3','a'],['J117',5,38,'A4','a'],['J117',9,40,'VCC','p'],['J117',10,8,'GND','g'],
 ['J121',6,39,'/CE','c'],
 ['J104',1,1,'O1','d'],['J104',2,2,'O2','d'],['J104',3,3,'O3','d'],['J104',4,4,'O4','d'],['J104',5,5,'O5','d'],['J104',6,6,'O6','d'],['J104',7,7,'O7','d'],['J104',8,33,'O8','d']]}};
+const PHOTOS={
+'2764':[['rom_2764.jpg','U45, U46, U65, U70 위치와 1번 핀. 초록(U45, U46)은 노치 확인, 빨강(U65, U70)은 보드 규칙으로 추정이라 뽑기 전에 노치가 아래쪽인지 확인합니다.'],
+        ['u45_u46_pins.jpg','U45, U46 전체 핀 번호: 앞면, 뒷면(납땜면, 좌우 반전), 뽑은 칩.']],
+'82S129':[['rom_82S129.jpg','U17, U18, U36, U38, U50, U51 위치와 1번 핀. 보드 규칙으로 추정이라 뽑기 전에 노치가 아래쪽인지 확인합니다. U17은 PROM인지 먼저 확인합니다.']],
+'82S123':[['rom_82S123.jpg','U5 위치와 1번 핀. 보드 규칙으로 추정이라 뽑기 전에 노치가 아래쪽인지 확인합니다.']]};
+function showPhotos(chip){
+  const box=document.getElementById('photos');box.innerHTML='';
+  PHOTOS[chip].forEach(([src,cap])=>{
+    const f=document.createElement('figure'),a=document.createElement('a'),i=document.createElement('img'),c=document.createElement('figcaption');
+    a.href=src;a.target='_blank';i.src=src;i.alt=cap;i.loading='lazy';c.textContent=cap;
+    a.appendChild(i);f.appendChild(a);f.appendChild(c);box.appendChild(f);
+  });
+}
 const HD=[['J117','PORTB','PB',62],['J121','PORTC','PC',222],['J104','PORTF','PF',382]];
 const NS='http://www.w3.org/2000/svg';
 function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
@@ -82,6 +104,7 @@ function show(chip){
   const g=document.getElementById('g');g.innerHTML='';un();pos={};
   for(const k in W)document.getElementById('b'+k).setAttribute('aria-pressed',k===chip);
   const w=W[chip];document.getElementById('cnt').textContent='점퍼 '+w.list.length+'가닥';
+  showPhotos(chip);
   const byH={},byZ={};w.list.forEach(r=>{byH[r[0]+'-'+r[1]]=r;byZ[r[2]]=r;});
   g.appendChild(el('rect',{x:12,y:28,width:330,height:520,rx:16,fill:'none',stroke:'var(--strong)','stroke-width':0.5,'stroke-dasharray':'4 3'}));
   g.appendChild(el('text',{class:'th',x:28,y:48},'ATmega128 통합 보드 (베이스 헤더)'));
