@@ -4,6 +4,8 @@ NewTC **AB-M128Pro-A** 베이스보드 위에 **AM-128RAM** CPU 모듈을 꽂은
 
 이전 FreeRTOS 펌웨어는 git 기록(커밋 `1a81ec1`)에 남아 있습니다.
 
+**관련 프로젝트**: [mildstorm/HART](https://github.com/mildstorm/HART) (정원 HART 애플 II 호환기 보드 분석). 덤프할 칩 목록·순서는 HART [`docs/11-rom-dump-list.md`](https://github.com/mildstorm/HART/blob/main/docs/11-rom-dump-list.md)를 따르고, 이 저장소 `rom/HART/`의 덤프는 같은 파일명으로 HART [`rom/`](https://github.com/mildstorm/HART/tree/main/rom)에 복사해 분석합니다 (SHA-1은 HART docs/11 "결과 기록" 표에도 적음).
+
 읽기 전용입니다. 펌웨어에는 쓰기, 소거, 프로그램 펄스가 없고 어떤 핀도 5 V를 넘지 않습니다.
 
 ## 1. 대상 칩
@@ -347,6 +349,8 @@ python tools\romdump.py -p COM11 -t 123 -o rom\HART\U5_82S123.bin
 | `rom/Malum/` | Malum 애플2 클론 (2732 ×3, 2716 ×1) |
 
 #### HART
+
+HART 저장소 사본: [`rom/`](https://github.com/mildstorm/HART/tree/main/rom), 결과 표: [`docs/11-rom-dump-list.md`](https://github.com/mildstorm/HART/blob/main/docs/11-rom-dump-list.md#결과-기록-덤프-후-채움).
 
 | 칩 | 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
 | --- | --- | --- | --- | --- | --- | --- |
