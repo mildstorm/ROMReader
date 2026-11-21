@@ -23,7 +23,21 @@ NewTC **AB-M128Pro-A** 베이스보드 위에 **AM-128RAM** CPU 모듈을 꽂은
 
 ### 2.1 베이스보드 포트 헤더
 
-베이스보드의 10핀 박스 헤더를 씁니다. 각 헤더는 1–8번이 Px0–Px7, **9번이 VCC(5 V), 10번이 GND**입니다. 처음 연결하기 전에 멀티미터로 9번 5 V, 10번 GND를 확인하세요.
+AM-128RAM 모듈을 꽂은 상태의 베이스보드 10핀 박스 헤더를 씁니다. 매뉴얼(`doc/AB-M128Pro-A/AB-M128PRO-A_manual.pdf` 2.2절) 기준으로 각 헤더는 1–8번이 Px0–Px7(홀수 줄 0, 2, 4, 6 / 짝수 줄 1, 3, 5, 7), **9번이 VCC(5 V), 10번이 GND**입니다. 처음 연결하기 전에 멀티미터로 9번 5 V, 10번 GND를 확인하세요.
+
+헤더 위치(매뉴얼 2.1절 구성도, 7805가 왼쪽 아래인 방향): PORTB는 왼쪽 위, PORTC는 아래 가운데, PORTA와 PORTF는 7세그먼트 왼쪽에 위아래로 붙은 두 헤더입니다. PORTA와 PORTF는 서로 헷갈리기 쉬우니 실크 인쇄(J120 = PORTA, J104 = PORTF)로 확인하세요.
+
+모듈과 베이스가 결합된 상태에서 각 포트에 걸린 부품(두 회로도와 매뉴얼 3.2, 3.3절 기준):
+
+| 포트 | 모듈(AM-128RAM) | 베이스(AB-M128Pro-A) | 이 리더에서 |
+| --- | --- | --- | --- |
+| PORTA | SRAM 데이터, 74LVC573, PA0 녹색 LED | 7세그먼트 세그먼트 A–DP | 사용 안 함, Low 고정 |
+| PORTB | 없음(PB1–PB3 ISP) | 없음 | A0–A7 |
+| PORTC | SRAM A8–A14, PC7 = SRAM /CS | PC0–PC3 7세그먼트 자리 선택 | A8–A12, /CE, /OE. PC7 High 고정 |
+| PORTD | 없음 | PD0/PD1 DS1307(I²C), PD2/PD3 UART1 | UART1만 사용 |
+| PORTE | PE0/PE1 MAX3232 | 없음 | 사용 안 함 |
+| PORTF | 없음 | PF4–PF7 JTAG 헤더 | D0–D7 |
+| PORTG | PG0/PG1 SRAM /WE /OE, PG2 ALE | PG0/PG1 LED, PG2/PG3 스위치 | PG0/PG1 상태 LED |
 
 | 헤더 | 포트 | 용도 |
 | --- | --- | --- |
