@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malum ZIF 결선도</title>
+<style>
+:root{--bg:#faf9f5;--card:#ffffff;--card2:#f1efe8;--text:#2c2c2a;--muted:#5f5e5a;--faint:#b4b2a9;--border:#d3d1c7;--strong:#888780;--accent:#185FA5;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1c;--card:#2a2927;--card2:#252422;--text:#ecebe6;--muted:#b4b2a9;--faint:#5f5e5a;--border:#444441;--strong:#888780;--accent:#85B7EB;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1f1e1c;--card:#2a2927;--card2:#252422;--text:#ecebe6;--muted:#b4b2a9;--faint:#5f5e5a;--border:#444441;--strong:#888780;--accent:#85B7EB;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;font-weight:500;margin:0 0 4px}
+p{margin:0 0 12px;color:var(--muted);font-size:14px}
+button{font:inherit;font-size:14px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:0 0 8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit;font-size:11px;fill:var(--muted)}
+svg .th{font-size:14px;font-weight:500;fill:var(--text)}
+h2{font-size:18px;font-weight:500;margin:28px 0 6px}
+a{color:var(--accent)}
+figure{margin:0 0 18px}
+figure img{display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--border);background:#fff}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+ul{margin:16px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+li{margin:4px 0}
+code{font-size:13px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;font-size:13px;width:100%;margin:6px 0 4px}
+th,td{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
+th{font-weight:500;color:var(--text)}
+td{color:var(--muted)}
+.note{border-left:3px solid var(--accent);padding:4px 10px;margin:10px 0;font-size:14px;color:var(--text);background:var(--card)}
+</style>
+</head>
+<body>
+<main>
+<h1>Malum ↔ ZIF 결선도</h1>
+<p>Malum 애플2 클론 보드의 ROM 4개(모두 24핀)를 읽는 방법입니다. HART 2764 결선(점퍼 27가닥)과 2764 펌웨어를 그대로 쓰고, 칩을 ZIF에 두 칸 내려 꽂고 브레드보드 점퍼 1가닥(ZIF 40 ↔ 38)을 더합니다. 핀에 마우스를 올리면 짝이 선으로 표시됩니다.</p>
+
+<div class="note">Malum 칩은 모두 24핀: 칩 1번을 ZIF 3번(브레드보드 3번 줄)에, 끝이 14번 줄. 노치는 레버 쪽.</div>
+
+<div class="tw"><table>
+<tr><th>칩</th><th>보드 위치</th><th>종류</th><th>ZIF 위치</th><th>파일</th><th>쓰는 부분</th></tr>
+<tr><td>D0</td><td>ROM 1 (D0)</td><td>2732</td><td>3–14줄</td><td><code>rom/Malum/D0.bin</code></td><td>앞 4 KB</td></tr>
+<tr><td>E0</td><td>ROM 3 (E0)</td><td>2732 (TMS 2732JL)</td><td>3–14줄</td><td><code>rom/Malum/E0.bin</code></td><td>앞 4 KB</td></tr>
+<tr><td>F0</td><td>ROM 5 (F0)</td><td>2732 (TMS 2732JL)</td><td>3–14줄</td><td><code>rom/Malum/F0.bin</code></td><td>앞 4 KB</td></tr>
+<tr><td>Rom1</td><td>KEY BOARD (ROM 7)</td><td>2716 (NEC D2716D)</td><td>3–14줄</td><td><code>rom/Malum/KEY.bin</code></td><td>0x0800–0x0FFF (2 KB)</td></tr>
+</table></div>
+
+<div class="row">
+  <button id="b2732" onclick="show('2732')">2732 (24핀) D0, E0, F0</button>
+  <button id="b2716" onclick="show('2716')">2716 (24핀) KEY</button>
+  <span id="cnt" style="font-size:13px;color:var(--muted);margin-left:6px"></span>
+</div>
+<div class="legend">
+  <span><span class="sw" style="background:#378ADD"></span>주소</span>
+  <span><span class="sw" style="background:#BA7517"></span>/CE, /OE</span>
+  <span><span class="sw" style="background:#1D9E75"></span>데이터</span>
+  <span><span class="sw" style="background:#E24B4A"></span>5 V</span>
+  <span><span class="sw" style="background:#888780"></span>GND</span>
+  <span><span class="sw" style="background:#C9C7BE"></span>점퍼는 있지만 칩 다리 없음</span>
+  <span>점선 칸 = 연결 안 함</span>
+</div>
+
+<svg id="sv" viewBox="0 0 680 570" role="img" aria-label="보드 헤더와 ZIF 소켓 결선"><g id="g"></g><g id="hl"></g></svg>
+
+<h2>사진 결선도와 ROM 사진</h2>
+<p>첫 사진은 실제 보드와 브레드보드 위 ZIF에 점퍼 번호를 표시한 결선도입니다. 그다음은 Malum 보드에서 칩 위치와 1번 핀입니다. 사진을 누르면 원본 크기로 열립니다.</p>
+<div id="photos"></div>
+
+<ul>
+  <li>ZIF 번호: 레버를 위로 놓고 왼쪽 줄 맨 위가 1번, 왼쪽 줄 아래로 20번, 오른쪽 줄 맨 아래 21번, 맨 위 40번.</li>
+  <li>헤더 쪽 점퍼 27가닥은 HART 2764와 같습니다(<a href="../HART/zif-wiring.html">HART 결선도</a>). 칩 종류를 바꿔도 펌웨어는 <code>RomReader_2764.hex</code> 그대로, 명령은 <code>romdump.py -t 2764</code>입니다. GODO 보드는 <a href="../GODO/zif-wiring.html">GODO 결선도</a>에 있습니다.</li>
+  <li>브레드보드 점퍼: 오른쪽 열 1번 줄(ZIF 40, 5 V)과 3번 줄(ZIF 38)을 잇습니다. 24핀 칩의 24번(VCC)이 ZIF 38에 옵니다. 2764의 26번(ZIF 38)은 NC라 꽂아 둔 채로 2764를 읽어도 됩니다. 사진: <a href="../24pin/20261122_042718.jpg" target="_blank">24pin/20261122_042718.jpg</a>.</li>
+  <li>24핀 칩을 ZIF 1번부터 꽂으면 전원 핀이 어긋납니다. 반드시 3번 줄부터 꽂습니다.</li>
+  <li>2716의 21번(VPP)은 A11 선(J121-4)에 걸립니다. 8 KB 읽기 중 A11이 High인 0x0800–0x0FFF 구간이 정상 읽기 조건이라 그 2 KB를 씁니다. D2716D는 네 구간 모두 같게 읽혔습니다.</li>
+  <li>칩을 꽂거나 뺄 때는 12 V 어댑터를 뽑습니다. 전원 순서와 문제 해결은 README 2.8절에 있습니다.</li>
+</ul>
+</main>
+<script>
+const C={a:'#378ADD',c:'#BA7517',d:'#1D9E75',p:'#E24B4A',g:'#888780',x:'#C9C7BE'};
+const L2764=[
+['J117',1,10,'A0','a'],['J117',2,9,'A1','a'],['J117',3,8,'A2','a'],['J117',4,7,'A3','a'],['J117',5,6,'A4','a'],['J117',6,5,'A5','a'],['J117',7,4,'A6','a'],['J117',8,3,'A7','a'],['J117',9,1,'VPP','p'],
+['J121',1,37,'A8','a'],['J121',2,36,'A9','a'],['J121',3,33,'A10','a'],['J121',4,35,'A11','a'],['J121',5,2,'A12','a'],['J121',6,32,'/CE','c'],['J121',7,34,'/OE','c'],['J121',9,40,'VCC','p'],['J121',10,14,'GND','g'],
+['J104',1,11,'O0','d'],['J104',2,12,'O1','d'],['J104',3,13,'O2','d'],['J104',4,27,'O3','d'],['J104',5,28,'O4','d'],['J104',6,29,'O5','d'],['J104',7,30,'O6','d'],['J104',8,31,'O7','d'],['J104',9,39,'/PGM','p']];
+function l24(p21){return L2764.map(r=>{const z=r[2];
+  if(z===1||z===2||z===39)return [r[0],r[1],z,'칩 없음','x'];
+  if(z===40)return [r[0],r[1],z,'5V→38','p'];
+  if(z===35)return [r[0],r[1],z,p21,'a'];
+  return r;});}
+const W={
+'2732':{start:3,rows:14,list:l24('A11'),bb:[40,38]},
+'2716':{start:3,rows:14,list:l24('VPP'),bb:[40,38]}};
+const PHOTOS={
+'2732':[['../24pin/wiring_photo_2732.jpg','2732 사진 결선도: 2764 결선 그대로, 칩은 ZIF 3–14번 줄. 빨간 선이 ZIF 40 ↔ 38 브레드보드 점퍼. 회색 번호는 점퍼가 있어도 칩 다리가 없는 자리입니다.'],
+        ['rom_malum.jpg','Malum 보드의 D0, E0, F0, KEY 위치와 1번 핀(노란 원), 노치(파란 원). D0, E0, F0가 이 탭의 칩이고 노치는 사진 오른쪽입니다.'],
+        ['../24pin/20261122_042718.jpg','실제 브레드보드 점퍼: 오른쪽 열 1번 줄(ZIF 40)과 3번 줄(ZIF 38).']],
+'2716':[['../24pin/wiring_photo_2716.jpg','2716 사진 결선도: 2732와 같고, ZIF 35(칩 21번)가 VPP입니다(A11 선).'],
+        ['rom_malum.jpg','KEY BOARD(ROM 7)의 D2716D(라벨 Rom1)가 이 탭의 칩입니다. 노치는 사진 아래쪽.']]};
+function showPhotos(chip){
+  const box=document.getElementById('photos');box.innerHTML='';
+  PHOTOS[chip].forEach(([src,cap])=>{
+    const f=document.createElement('figure'),a=document.createElement('a'),i=document.createElement('img'),c=document.createElement('figcaption');
+    a.href=src;a.target='_blank';i.src=src;i.alt=cap;i.loading='lazy';c.textContent=cap;
+    a.appendChild(i);f.appendChild(a);f.appendChild(c);box.appendChild(f);
+  });
+}
+const HD=[['J117','PORTB','PB',62],['J121','PORTC','PC',222],['J104','PORTF','PF',382]];
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+let pos={};
+function zy(z){const r=z<=20?z:41-z;return 72+(r-1)*24;}
+function zx(z){return z<=20?490:550;}
+function show(chip){
+  const g=document.getElementById('g');g.innerHTML='';un();pos={};
+  for(const k in W)document.getElementById('b'+k).setAttribute('aria-pressed',k===chip);
+  const w=W[chip];document.getElementById('cnt').textContent='점퍼 '+w.list.length+'가닥'+(w.bb?' + 브레드보드 1가닥':'');
+  showPhotos(chip);
+  const byH={},byZ={};w.list.forEach(r=>{byH[r[0]+'-'+r[1]]=r;byZ[r[2]]=r;});
+  g.appendChild(el('rect',{x:12,y:28,width:330,height:520,rx:16,fill:'none',stroke:'var(--strong)','stroke-width':0.5,'stroke-dasharray':'4 3'}));
+  g.appendChild(el('text',{class:'th',x:28,y:48},'ATmega128 통합 보드 (베이스 헤더)'));
+  HD.forEach(([h,port,px,y0])=>{
+    g.appendChild(el('rect',{x:24,y:y0,width:306,height:148,rx:8,fill:'var(--card2)',stroke:'var(--border)','stroke-width':0.5}));
+    g.appendChild(el('text',{class:'th',x:36,y:y0+20},h+'  '+port));
+    for(let p=1;p<=10;p++){
+      const col=(p-1)%2,row=Math.floor((p-1)/2),x=34+col*148,y=y0+32+row*22;
+      const sig=p===9?'5V':p===10?'GND':px+(p-1),r=byH[h+'-'+p];
+      const gg=el('g',{});
+      gg.appendChild(el('rect',{x:x,y:y,width:140,height:19,rx:4,fill:r?'var(--card)':'none',stroke:r?C[r[4]]:'var(--border)','stroke-width':r?1:0.5,'stroke-dasharray':r?'':'3 3'}));
+      gg.appendChild(el('text',{x:x+6,y:y+13},p+' '+sig));
+      gg.appendChild(el('text',{x:x+134,y:y+13,'text-anchor':'end',style:'fill:'+(r?C[r[4]]:'var(--faint)')},r?'ZIF '+r[2]+' '+r[3]:'—'));
+      if(r){pos[r[0]+'-'+r[1]]=[x+140,y+9];gg.onmouseenter=()=>hi(r);gg.onmouseleave=un;}
+      g.appendChild(gg);
+    }
+  });
+  g.appendChild(el('rect',{x:478,y:30,width:84,height:530,rx:8,fill:'var(--card2)',stroke:'var(--strong)','stroke-width':0.5}));
+  g.appendChild(el('rect',{x:500,y:34,width:40,height:10,rx:3,fill:'var(--strong)'}));
+  g.appendChild(el('text',{x:520,y:24,'text-anchor':'middle'},'레버 쪽'));
+  const cy0=zy(w.start)-10,cy1=zy(w.rows)+10;
+  g.appendChild(el('rect',{x:484,y:cy0,width:72,height:cy1-cy0,rx:4,fill:'none',stroke:'var(--muted)','stroke-width':1}));
+  g.appendChild(el('path',{d:'M512 '+cy0+' A8 8 0 0 0 528 '+cy0,fill:'none',stroke:'var(--muted)','stroke-width':1}));
+  g.appendChild(el('text',{x:520,y:(cy0+cy1)/2,'text-anchor':'middle','dominant-baseline':'central'},chip));
+  if(w.bb){
+    const [a,b]=w.bb,ya=zy(a),yb=zy(b);
+    g.appendChild(el('path',{d:'M'+(zx(a)+5)+' '+ya+' C'+(zx(a)+26)+' '+ya+' '+(zx(b)+26)+' '+yb+' '+(zx(b)+5)+' '+yb,fill:'none',stroke:C.p,'stroke-width':2.5}));
+  }
+  for(let z=1;z<=40;z++){
+    const x=zx(z),y=zy(z),r=byZ[z],left=z<=20,gg=el('g',{});
+    const isBB=w.bb&&z===w.bb[1];
+    const col=r?C[r[4]]:isBB?C.p:null;
+    gg.appendChild(el('circle',{cx:x,cy:y,r:4,fill:col||'none',stroke:col||'var(--strong)','stroke-width':0.8}));
+    gg.appendChild(el('text',{x:left?x+9:x-9,y:y+4,'text-anchor':left?'start':'end'},z));
+    if(r){
+      gg.appendChild(el('text',{x:left?470:(z===40&&w.bb?582:570),y:y+4,'text-anchor':left?'end':'start',style:'fill:'+C[r[4]]},left?r[3]+' ← '+r[0]+'-'+r[1]:r[0]+'-'+r[1]+' → '+(z===40&&w.bb?'5V':r[3])));
+      pos['Z'+z]=[x,y];gg.onmouseenter=()=>hi(r);gg.onmouseleave=un;
+    }else if(isBB){
+      gg.appendChild(el('text',{x:582,y:y+4,'text-anchor':'start',style:'fill:'+C.p},'VCC ← 40'));
+    }
+    g.appendChild(gg);
+  }
+}
+function hi(r){
+  const a=pos[r[0]+'-'+r[1]],b=pos['Z'+r[2]],h=document.getElementById('hl');h.innerHTML='';
+  const d=b[0]<520?'M'+a[0]+' '+a[1]+' L400 '+a[1]+' L400 '+b[1]+' L'+b[0]+' '+b[1]
+                  :'M'+a[0]+' '+a[1]+' L400 '+a[1]+' L400 22 L600 22 L600 '+b[1]+' L'+b[0]+' '+b[1];
+  h.appendChild(el('path',{d:d,fill:'none',stroke:C[r[4]],'stroke-width':2}));
+}
+function un(){document.getElementById('hl').innerHTML='';}
+show('2732');
+</script>
+</body>
+</html>
