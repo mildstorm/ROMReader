@@ -4,6 +4,8 @@
  * Board: AB-M128Pro-A base + AM-128RAM CPU module, 16 MHz.
  * Reads 2764 EPROM (8K x 8), 82S129/82S126 PROM (256 x 4), 82S123 PROM (32 x 8).
  * Read only: no pin is ever driven above VCC, no program pulse exists.
+ * The chip type is fixed at build time (see "chip" below); one ZIF socket is
+ * rewired per chip type as README section 2 shows.
  *
  * Pins (base board 10-pin headers, pin 9 = VCC, pin 10 = GND):
  *   J117 PORTB  PB0-PB7  -> A0-A7      (output)
@@ -35,7 +37,11 @@
 
 #define READS_PER_ADDR 3
 
-/* ---------- chip table ---------- */
+/*
+ * ---------- chip, fixed at build time ----------
+ * One firmware per chip type: `make CHIP=2764`, `make CHIP=82S129`,
+ * `make CHIP=82S123`. Flash the one that matches the ZIF wiring.
+ */
 
 typedef struct {
     const char *name;   /* in flash */
@@ -43,18 +49,19 @@ typedef struct {
     uint8_t mask;       /* valid data bits */
 } chip_t;
 
-static const char n2764[] PROGMEM = "2764";
-static const char n129[]  PROGMEM = "82S129";
-static const char n123[]  PROGMEM = "82S123";
+#if defined(CHIP_2764)
+static const char chip_name[] PROGMEM = "2764";
+static const chip_t chip = { chip_name, 8192, 0xFF };
+#elif defined(CHIP_82S129)
+static const char chip_name[] PROGMEM = "82S129";
+static const chip_t chip = { chip_name, 256, 0x0F };
+#elif defined(CHIP_82S123)
+static const char chip_name[] PROGMEM = "82S123";
+static const chip_t chip = { chip_name, 32, 0xFF };
+#else
+#error "build with CHIP=2764, CHIP=82S129 or CHIP=82S123"
+#endif
 
-static const chip_t chips[] = {
-    { n2764, 8192, 0xFF },
-    { n129,   256, 0x0F },
-    { n123,    32, 0xFF },
-};
-#define CHIP_COUNT (sizeof(chips) / sizeof(chips[0]))
-
-static uint8_t chip_sel = 0;    /* 2764 */
 static uint8_t error_led = 0;
 
 /* ---------- UART1 ---------- */
@@ -209,7 +216,7 @@ static uint8_t read_byte(uint16_t a, uint8_t *stable)
 
 static const chip_t *cur(void)
 {
-    return &chips[chip_sel];
+    return &chip;
 }
 
 static void print_chip(void)
@@ -224,34 +231,12 @@ static void print_chip(void)
 static void cmd_help(void)
 {
     PUTS("Commands:\r\n"
-         "  type 2764|129|123   select chip (82S126 reads as 129)\r\n"
-         "  info                show selected chip\r\n"
+         "  info                chip this firmware was built for\r\n"
          "  dump                whole chip as Intel HEX\r\n"
          "  hex [addr] [len]    hex view (hex numbers)\r\n"
          "  peek <addr>         one address\r\n"
          "  check               chip present / outputs driven test\r\n"
          "  help\r\n");
-}
-
-static void cmd_type(const char *arg)
-{
-    if (!arg) {
-        PUTS("ERR type needs 2764, 129 or 123\r\n");
-        return;
-    }
-    if (strstr_P(arg, PSTR("2764")))
-        chip_sel = 0;
-    else if (strstr_P(arg, PSTR("129")) || strstr_P(arg, PSTR("126")))
-        chip_sel = 1;
-    else if (strstr_P(arg, PSTR("123")))
-        chip_sel = 2;
-    else {
-        PUTS("ERR unknown type\r\n");
-        return;
-    }
-    PUTS("OK ");
-    print_chip();
-    put_nl();
 }
 
 /*
@@ -435,7 +420,9 @@ int main(void)
     bus_init();
     uart_init();
 
-    PUTS("\r\nATmega128 ROM reader (read only)\r\n");
+    PUTS("\r\nATmega128 ROM reader (read only), built for ");
+    print_chip();
+    PUTS("\r\nWire the ZIF for this chip before inserting it.\r\n");
     cmd_help();
 
     for (;;) {
@@ -453,8 +440,6 @@ int main(void)
         led_busy(1);
         if (!strcmp_P(cmd, PSTR("help")) || !strcmp_P(cmd, PSTR("?")))
             cmd_help();
-        else if (!strcmp_P(cmd, PSTR("type")))
-            cmd_type(a1);
         else if (!strcmp_P(cmd, PSTR("info"))) {
             print_chip();
             put_nl();

@@ -6,8 +6,10 @@ Example:
     python tools/romdump.py -p COM11 -t 129  -o rom/U50_1.bin
     python tools/romdump.py -p COM11 -t 123  -o rom/U5_82S123.bin
 
-The chip is read --reads times (default 2). The file is written only when
-every read is identical and the firmware reported no unstable address.
+The board must run the firmware built for that chip (RomReader_<chip>.hex);
+the script checks this before reading. The chip is read --reads times
+(default 2). The file is written only when every read is identical and the
+firmware reported no unstable address.
 """
 import argparse
 import hashlib
@@ -20,6 +22,7 @@ import serial
 SIZES = {"2764": 8192, "129": 256, "123": 32}
 ALIASES = {"2764": "2764", "82s129": "129", "129": "129", "82s126": "129",
            "126": "129", "82s123": "123", "123": "123"}
+NAMES = {"2764": "2764", "129": "82S129", "123": "82S123"}   # firmware names
 
 
 def wait_prompt(ser, timeout=3.0):
@@ -34,7 +37,7 @@ def wait_prompt(ser, timeout=3.0):
             if buf.endswith(b"]> "):
                 return buf.decode("ascii", "replace")
     raise TimeoutError("no prompt from board. Check COM port, 38400 baud, "
-                       "TX/RX wiring and that RomReader.hex is flashed.\n"
+                       "TX/RX wiring and that a RomReader_<chip>.hex is flashed.\n"
                        f"received: {buf[-200:]!r}")
 
 
@@ -91,9 +94,14 @@ def main():
         ser.write(b"\r")
         wait_prompt(ser)
 
-        reply = command(ser, f"type {kind}")
-        if "OK" not in reply:
-            sys.exit(f"type failed: {reply}")
+        # The chip type is fixed in the firmware; refuse if the flashed one
+        # does not match -t (the ZIF wiring is for one chip type).
+        reply = command(ser, "info")
+        flashed = next((n for n in NAMES.values() if f"{n} size=" in reply), None)
+        if flashed != NAMES[kind]:
+            sys.exit(f"board runs the {flashed or 'unknown'} firmware but -t is "
+                     f"{NAMES[kind]}. Flash RomReader_{NAMES[kind]}.hex and wire the "
+                     "ZIF for that chip first. Nothing read.")
 
         print(command(ser, "check").strip().rsplit("\n", 1)[0])
 
