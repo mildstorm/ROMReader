@@ -1,135 +1,189 @@
-# ATmega128 FreeRTOS
+# ATmega128 ROM Reader
 
-NewTC **AB-M128Pro-A** 베이스보드 위에 **AM-128RAM** CPU 모듈을 꽂은 구성에서 동작하는 FreeRTOS 펌웨어입니다. MCU는 ATmega128, 클럭은 모듈 크리스탈 **16 MHz**입니다.
+NewTC **AB-M128Pro-A** 베이스보드 위에 **AM-128RAM** CPU 모듈을 꽂은 보드로 HART 메인보드의 ROM/PROM을 읽는 리더입니다. RTOS 없이 동작하는 단일 루프 펌웨어(`RomReader/`)와 PC 덤프 스크립트(`tools/romdump.py`)로 구성됩니다. MCU는 ATmega128, 클럭은 모듈 크리스탈 **16 MHz**입니다.
 
-펌웨어 소스는 `FreeRTOSStackFinalSerial/FreeRTOS`에 있습니다.
+이전 FreeRTOS 펌웨어는 git 기록(커밋 `1a81ec1`)에 남아 있습니다.
 
-## 1. 보드 결합
+읽기 전용입니다. 펌웨어에는 쓰기, 소거, 프로그램 펄스가 없고 어떤 핀도 5 V를 넘지 않습니다.
 
-두 보드를 헤더로 포개어 사용합니다.
+## 1. 대상 칩
 
-| 보드 | 역할 |
-| --- | --- |
-| AB-M128Pro-A | 베이스. 12 V 어댑터, 7805(5 V), 4자리 7세그먼트, LED(PG0/PG1), UART1 핀헤더, ISP |
-| AM-128RAM | CPU 모듈. ATmega128-16AU, 16 MHz 크리스탈, 32 KB SRAM(IS62C256-70) |
+목록은 [HART docs/11-rom-dump-list.md](https://github.com/mildstorm/HART/blob/main/docs/11-rom-dump-list.md)를 따릅니다.
 
-모듈을 베이스 소켓에 끝까지 꽂습니다. 모듈 헤더의 XTAL 핀(23, 24)은 오픈이라 베이스의 7.3728 MHz 발진은 쓰지 않고, MCU는 모듈의 16 MHz로 동작합니다. 전원은 베이스의 12 V 어댑터입니다.
+| 종류 | 용량 | 핀 | 대상 | `-t` |
+| --- | --- | --- | --- | --- |
+| 2764 EPROM | 8 KB (8192 × 8) | 28 | U45 C/D8, U46 EF5, U65 VD5, U70 CHR P4 | `2764` |
+| 82S129 바이폴라 PROM | 256 × 4 | 16 | U50 1, U51 2, U36 3, U38, U18 M, (U17) | `129` |
+| 82S123 바이폴라 PROM | 32 × 8 | 16 | U5 | `123` |
 
-외부 SRAM 배선은 다음과 같습니다. `make`(기본값 `BOARD=stacked`)는 7세그먼트와 핀이 겹치므로 XMEM을 켜지 않고, PC7(/CS)을 High로 잡아 SRAM을 버스에서 떼어 둡니다. CPU 모듈만 쓸 때는 `make BOARD=cpu`로 외부 SRAM을 켭니다. 아래 빌드 옵션을 보면 됩니다.
+- 82S129 파일은 256바이트이며 상위 4비트는 0입니다. 오픈 컬렉터인 82S126도 같은 결선과 `-t 129`로 읽힙니다. 데이터 핀에 내부 풀업이 걸려 있습니다.
+- U17은 PROM인지 확인되지 않았습니다. 목록 문서의 절차대로 U18과 1–7, 15번 핀 도통을 먼저 확인하고, 대부분 일치할 때만 82S129 결선에 꽂습니다.
 
-| SRAM | MCU |
-| --- | --- |
-| A0–A7 | PA, ALE(PG2)로 74LVC573에 래치 |
-| A8–A14 | PC0–PC6 |
-| /CS | PC7 (Low일 때 선택, 0x0000–0x7FFF) |
-| /WE | PG0 |
-| /OE | PG1 |
+## 2. 결선
 
-회로와 매뉴얼은 `doc/AB-M128Pro-A`, `doc/AM-128RAM`에 있습니다. 결합 사진은 `doc/AB-M128Pro-A_AM-128RAM.jpg`입니다.
+### 2.1 베이스보드 포트 헤더
 
-## 2. 케이블 결선
+베이스보드의 10핀 박스 헤더를 씁니다. 각 헤더는 1–8번이 Px0–Px7, **9번이 VCC(5 V), 10번이 GND**입니다. 처음 연결하기 전에 멀티미터로 9번 5 V, 10번 GND를 확인하세요.
 
-USB 허브의 포트 스위치는 해당 동글의 USB 전원만 켜고 끕니다. 보드 전원은 12 V 어댑터입니다. 플래시할 때는 STK500 포트를 켜고, CLI를 볼 때는 FT232 포트를 켭니다. 둘 다 켜 두어도 됩니다. STK500이 프로그래밍 모드를 빠져나오면 리셋은 풀립니다.
+| 헤더 | 포트 | 용도 |
+| --- | --- | --- |
+| J117 | PORTB | PB0–PB7 → A0–A7 |
+| J121 | PORTC | PC0–PC4 → A8–A12, PC5 → /CE, PC6 → /OE, **PC7(8번)은 연결 안 함** |
+| J104 | PORTF | PF0–PF7 ← D0–D7 |
+| J120 | PORTA | 사용 안 함 |
 
-### ISP (플래시)
+이유:
 
-USB STK500을 보드 ISP 커넥터에 연결합니다. 이 PC에서는 **COM10**으로 잡힙니다.
+- PORTA는 모듈 SRAM 버스(74LVC573, IS62C256), 모듈 녹색 LED(PA0), 7세그먼트 세그먼트가 걸려 있어 데이터 입력으로 쓰지 않습니다. 펌웨어는 PORTA를 Low로 두어 7세그먼트를 끕니다.
+- PC7은 모듈 SRAM의 /CS입니다. 펌웨어가 High로 고정해 SRAM이 버스를 잡지 않게 합니다. PC0–PC6에 걸린 SRAM 주소 입력과 7세그먼트 자리 선택은 부하가 아닙니다.
+- PORTF의 PF4–PF7은 JTAG 핀입니다. 펌웨어가 기동 시 `JTD`로 JTAG를 끄므로 퓨즈를 바꿀 필요는 없습니다. JTAG 헤더(J115)에는 아무것도 꽂지 않습니다.
+- PORTD(UART1, I²C RTC), PORTE(MAX3232가 PE0을 구동), PORTG(LED, 버튼)는 피했습니다.
+- PB1–PB3은 ISP(SCK, MOSI, MISO)와 공유하지만 ROM 쪽에서는 주소 입력이라 충돌이 없습니다. 그래도 플래시는 ROM을 빼고 하는 것을 권합니다.
 
-### CLI 시리얼 (FT232 TTL)
+ROM의 VCC와 GND는 같은 헤더의 9, 10번에서 가져옵니다. 2764는 최대 약 100 mA, 82S129는 약 130 mA이므로 7805로 충분합니다.
 
-베이스보드 UART1 헤더를 사용합니다. 모듈의 3핀 RS-232 커넥터(MAX232, ±12 V)에는 연결하지 않습니다.
+브레드보드에 28핀 ZIF 소켓 하나와 16핀 ZIF 소켓 하나를 두고 각각 아래처럼 배선해 두면 칩만 바꿔 꽂으면 됩니다. 두 소켓에 동시에 칩을 꽂지 마세요(데이터선을 공유합니다).
 
-UART1 실크 핀:
+### 2.2 2764 EPROM (28핀)
 
-| 핀 | 신호 |
-| --- | --- |
-| 1 | VCC |
-| 2 | TX1 (MCU PD3) |
-| 3 | RX1 (MCU PD2) |
-| 4 | GND |
+| 2764 핀 | 신호 | 연결 | | 2764 핀 | 신호 | 연결 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | VPP | +5 V | | 28 | VCC | +5 V (J121-9) |
+| 2 | A12 | PC4 (J121-5) | | 27 | /PGM | +5 V |
+| 3 | A7 | PB7 (J117-8) | | 26 | NC | 연결 안 함 |
+| 4 | A6 | PB6 (J117-7) | | 25 | A8 | PC0 (J121-1) |
+| 5 | A5 | PB5 (J117-6) | | 24 | A9 | PC1 (J121-2) |
+| 6 | A4 | PB4 (J117-5) | | 23 | A11 | PC3 (J121-4) |
+| 7 | A3 | PB3 (J117-4) | | 22 | /OE | PC6 (J121-7) |
+| 8 | A2 | PB2 (J117-3) | | 21 | A10 | PC2 (J121-3) |
+| 9 | A1 | PB1 (J117-2) | | 20 | /CE | PC5 (J121-6) |
+| 10 | A0 | PB0 (J117-1) | | 19 | O7 | PF7 (J104-8) |
+| 11 | O0 | PF0 (J104-1) | | 18 | O6 | PF6 (J104-7) |
+| 12 | O1 | PF1 (J104-2) | | 17 | O5 | PF5 (J104-6) |
+| 13 | O2 | PF2 (J104-3) | | 16 | O4 | PF4 (J104-5) |
+| 14 | GND | GND (J121-10) | | 15 | O3 | PF3 (J104-4) |
 
-FT232는 TTL, 점퍼 **5 V**. 보드가 12 V 어댑터로 전원을 받으므로 FT232 VCC는 연결하지 않습니다. DTR, CTS도 연결하지 않습니다.
+VPP(1)과 /PGM(27)은 VCC에 묶습니다. 읽기 모드 조건이며 12.5/21 V 프로그램 전압은 쓰지 않습니다.
+
+### 2.3 82S129 / 82S126 PROM (16핀, 256 × 4)
+
+| 82S129 핀 | 신호 | 연결 | | 82S129 핀 | 신호 | 연결 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | A6 | PB6 (J117-7) | | 16 | VCC | +5 V (J117-9) |
+| 2 | A5 | PB5 (J117-6) | | 15 | A7 | PB7 (J117-8) |
+| 3 | A4 | PB4 (J117-5) | | 14 | /CE2 | PC5 (J121-6) |
+| 4 | A3 | PB3 (J117-4) | | 13 | /CE1 | PC5 (J121-6) |
+| 5 | A0 | PB0 (J117-1) | | 12 | O1 | PF0 (J104-1) → D0 |
+| 6 | A1 | PB1 (J117-2) | | 11 | O2 | PF1 (J104-2) → D1 |
+| 7 | A2 | PB2 (J117-3) | | 10 | O3 | PF2 (J104-3) → D2 |
+| 8 | GND | GND (J117-10) | | 9 | O4 | PF3 (J104-4) → D3 |
+
+주소 핀 순서가 1번부터 차례대로가 아닙니다(5, 6, 7번이 A0, A1, A2).
+
+### 2.4 82S123 PROM (16핀, 32 × 8)
+
+| 82S123 핀 | 신호 | 연결 | | 82S123 핀 | 신호 | 연결 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | O1 | PF0 (J104-1) → D0 | | 16 | VCC | +5 V |
+| 2 | O2 | PF1 (J104-2) → D1 | | 15 | /CE | PC5 (J121-6) |
+| 3 | O3 | PF2 (J104-3) → D2 | | 14 | A4 | PB4 (J117-5) |
+| 4 | O4 | PF3 (J104-4) → D3 | | 13 | A3 | PB3 (J117-4) |
+| 5 | O5 | PF4 (J104-5) → D4 | | 12 | A2 | PB2 (J117-3) |
+| 6 | O6 | PF5 (J104-6) → D5 | | 11 | A1 | PB1 (J117-2) |
+| 7 | O7 | PF6 (J104-7) → D6 | | 10 | A0 | PB0 (J117-1) |
+| 8 | GND | GND | | 9 | O8 | PF7 (J104-8) → D7 |
+
+82S129, 82S123 모두 O1을 D0(LSB)으로 둡니다. 비트 순서가 반대인 것으로 보이면 결선은 그대로 두고 파일에서 뒤집으면 됩니다.
+
+16핀 소켓 하나로 두 PROM을 다 받으려면 핀 배치가 달라서 점퍼를 바꿔야 합니다. 82S123용 16핀 소켓을 따로 두는 편이 실수가 적습니다(U5 한 개뿐).
+
+### 2.5 시리얼과 ISP
+
+FT232 TTL(5 V 점퍼)을 베이스보드 UART1 헤더에 연결합니다. 모듈의 3핀 RS-232 커넥터(MAX232, ±12 V)에는 연결하지 않습니다. FT232 VCC, DTR, CTS는 연결하지 않습니다.
 
 | FT232 | 보드 UART1 |
 | --- | --- |
 | GND | 4 GND |
-| RX | 2 TX1 |
-| TX | 3 RX1 |
-| VCC | 연결 안 함 |
+| RX | 2 TX1 (PD3) |
+| TX | 3 RX1 (PD2) |
 
-이 PC에서 FT232는 **COM11**입니다. 터미널은 **9600 8N1**, 흐름 제어 없음입니다.
+이 PC에서 FT232는 **COM11**, 통신은 **38400 8N1**, 흐름 제어 없음입니다. STK500은 보드 ISP 커넥터에 연결하며 **COM10**입니다.
 
-## 3. 플래싱 (avrdude)
-
-avrdude 8.3 소스는 `avrdude/`에 있고, Windows 빌드 결과는 다음 경로입니다.
-
-- `avrdude/build-ucrt64/src/avrdude.exe`
-- `avrdude/build-ucrt64/src/avrdude.conf`
-
-실행 시 `D:\msys64\ucrt64\bin`이 PATH에 있어야 합니다. libusb, hidapi, libftdi, readline이 여기 있습니다. STK500은 v2, **115200 8N1**, 대상은 `m128`입니다.
-
-펌웨어 빌드 (MSYS2, avr-gcc). 보드 구성에 따라 `BOARD`를 고릅니다.
-
-| `BOARD` | 하드웨어 | 동작 |
-| --- | --- | --- |
-| `stacked` (기본) | 베이스 + CPU | 7세그먼트, PG0/PG1 LED, 힙 2048바이트는 내부 SRAM |
-| `cpu` | AM-128RAM만 | 7세그먼트와 LED 없음. 힙 28416바이트(`0x1100`–`0x7FFF`)는 외부 SRAM. 스택과 전역 변수는 내부 SRAM |
-
-`cpu`를 결합된 보드에 쓰면 PORTA, PC, PG0, PG1이 메모리 버스가 되어 7세그먼트와 LED는 멈춥니다. 베이스를 떼면 UART1 핀헤더도 같이 빠지고, 모듈의 RS-232 커넥터만 남습니다.
+## 3. 빌드와 플래시
 
 ```bash
 export PATH=/ucrt64/bin:$PATH
-cd FreeRTOSStackFinalSerial/FreeRTOS
-make                  # BOARD=stacked
-make BOARD=cpu        # CPU 모듈만, 외부 SRAM
+cd RomReader
+make
 ```
 
-산출물: `build/stacked/FreeRTOS.hex`, `build/cpu/FreeRTOS.hex`
-
-플래시 (PowerShell, COM 번호는 장치 관리자 기준):
+산출물: `RomReader/build/RomReader.hex`
 
 ```powershell
 $env:PATH = "D:\msys64\ucrt64\bin;" + $env:PATH
 & .\avrdude\build-ucrt64\src\avrdude.exe `
   -C .\avrdude\build-ucrt64\src\avrdude.conf `
   -c stk500v2 -P COM10 -b 115200 -p m128 `
-  -U flash:w:FreeRTOSStackFinalSerial\FreeRTOS\build\stacked\FreeRTOS.hex:i
+  -U flash:w:RomReader\build\RomReader.hex:i
 ```
 
-쓰기가 끝나면 avrdude가 플래시를 다시 읽어 검증합니다. CLI 세션(COM11)은 그대로 두고, 플래시 후 보드를 리셋하면 부팅 로고와 프롬프트가 나옵니다.
+퓨즈는 바꾸지 않습니다. JTAG는 펌웨어가 런타임에 끕니다.
 
-## 4. STK500 드라이버
+## 4. 덤프 절차
 
-STK500 USB-시리얼(Prolific) 드라이버는 `driver/STK500-COM-Driver.zip`에 있습니다. 장치 관리자에 STK500이 없거나 노란 느낌표가 있으면 이 압축을 풀어 설치합니다. 설치 후 포트 번호(이 PC는 COM10)를 확인하고 위 avrdude 명령의 `-P`에 맞춥니다.
+1. 보드 전원을 끈 상태(S104 OFF)에서 칩을 소켓에 꽂습니다. 노치 방향을 확인하고, 칩을 빼기 전에 원래 보드에서의 방향을 사진으로 남깁니다.
+2. 전원을 켭니다. 베이스보드 PG0 LED(D101)는 명령 처리 중에 켜지고, PG1 LED(D102)는 마지막 `dump`에서 불안정한 주소가 있었을 때 켜집니다.
+3. 덤프합니다. 기본으로 두 번 읽어 비교하고, 각 주소도 펌웨어가 세 번씩 읽습니다. 하나라도 다르면 파일을 쓰지 않습니다.
 
-FT232는 별도입니다. FTDI 드라이버가 잡히면 "USB Serial Port"로 보이며, 이 PC에서는 COM11입니다.
+```powershell
+python tools\romdump.py -p COM11 -t 2764 -o rom\U45_CD8.bin
+```
 
-## 5. FreeRTOS 구현
+```powershell
+python tools\romdump.py -p COM11 -t 129 -o rom\U50_1.bin
+```
 
-클럭 16 MHz, 틱 1 ms (`configTICK_RATE_HZ` 1000). `.data`와 `.bss`는 항상 내부 4 KB(`__DATA_REGION_LENGTH__=0x1000`)에 있습니다. 하드웨어 스택도 내부 SRAM 끝(`0x10FF`)에 있습니다.
+```powershell
+python tools\romdump.py -p COM11 -t 123 -o rom\U5_82S123.bin
+```
 
-`stacked`에서는 힙 2048바이트도 내부 SRAM입니다. PORTA와 PC0–PC3이 7세그먼트이므로 XMEM은 꺼져 있고 PC7은 High입니다. `cpu`에서는 기동 초기에 XMEM을 켭니다. PC7은 `/CS`로 두고 웨이트는 1입니다. FreeRTOS 힙만 `.noinit`으로 `0x1100`에 놓습니다. PG0/PG1은 `/WE`, `/OE`이라 LED로 쓰지 않습니다.
+스크립트는 먼저 `check`를 실행해 칩이 응답하는지 보여 주고, 끝에 크기와 SHA-1을 출력합니다. 이 값을 HART 목록 문서의 결과 표에 옮기면 됩니다. pyserial이 필요합니다(`pip install pyserial`).
 
-태스크:
+4. 전원을 끈 뒤 칩을 빼서 원래 위치와 방향으로 되돌립니다.
 
-| 태스크 | 우선순위 | 동작 |
-| --- | --- | --- |
-| SEG | idle+6 | 4자리 7세그먼트. 1 ms마다 한 자리씩 다중화, 1초마다 0000–9999 증가(앞자리 0 표시). 왼쪽(PC0)이 천의 자리 |
-| LED | idle+5 | PG0, PG1을 250 ms 간격으로 번갈아 토글. High가 켜짐 |
-| SHELL | idle+4 | USART1 CLI |
+8 KB 2764 한 번 읽는 데 약 6초 걸립니다.
 
-7세그먼트는 공통 캐소드, 세그먼트 활성 High입니다. 폰트는 0=`0x3F` … 9=`0x67`. 자릿수 PC0–PC3은 활성 Low입니다. PC7은 High로 고정해 SRAM이 버스를 구동하지 않게 합니다. PG0/PG1은 SRAM /WE, /OE이기도 하지만 /CS가 High이면 GPIO로 토글해도 SRAM은 응답하지 않습니다.
+### 터미널 명령
 
-### CLI
-
-USART1, **9600 8N1**. 프롬프트는 `[root@FreeRTOS]#`입니다. 부팅 시 ASCII 고양이 로고를 출력한 뒤 프롬프트가 나옵니다. 9600 bps라 로고가 다 그려지기까지 몇 초 걸립니다. 터미널 폭은 80칸 이상을 권합니다.
-
-Enter는 CR 또는 LF입니다. 입력은 에코되고, Backspace(0x08, 0x7F)를 처리합니다.
+시리얼 터미널(COM11, 38400 8N1)로 직접 써도 됩니다. 프롬프트는 `[2764]> `처럼 선택된 칩을 보여 줍니다. 숫자 인자는 16진수입니다.
 
 | 명령 | 설명 |
 | --- | --- |
-| `help` | 등록된 명령 목록 |
-| `set-net <ip> <subnet> <gateway>` | 인자 3개가 필요합니다. IP와 서브넷만 저장하고 게이트웨이는 사용하지 않습니다 |
-| `get-net` | 고정 MAC과 `8.8.8.8`을 출력합니다. `set-net`으로 저장한 값은 반영되지 않습니다 |
+| `type 2764` / `type 129` / `type 123` | 칩 종류 선택 |
+| `info` | 선택된 칩, 크기, 데이터 마스크 |
+| `check` | /CE를 끈 상태와 켠 상태를 비교. 칩이 없거나 전원, 데이터선 문제를 알려 줍니다 |
+| `hex [addr] [len]` | 16진 보기. 기본 0번지부터 0x100바이트. 불안정한 바이트 뒤에는 `?` |
+| `peek <addr>` | 한 주소 읽기 |
+| `dump` | 칩 전체를 Intel HEX로 출력. `#`로 시작하는 줄은 상태 |
+| `help` | 명령 목록 |
 
-네트워크 명령은 실제 이더넷 설정이 아닙니다. 저장한 문자열을 보여주는 예제입니다.
+`check` 해석:
+
+- `disabled: bits pulled low` 가 0이 아니면 칩이 꺼져 있어도 데이터선을 끌어내리는 것입니다. /CE 결선이나 쇼트를 확인합니다.
+- `WARN no bit ever driven low` 는 칩이 없거나, 전원이 없거나, /CE가 연결되지 않은 경우입니다.
+- `NOTE some data bits never 0` 는 해당 비트의 데이터선이 빠졌을 가능성이 큽니다(데이터가 실제로 그럴 수도 있습니다).
+
+## 5. STK500 드라이버
+
+STK500 USB-시리얼(Prolific) 드라이버는 `driver/STK500-COM-Driver.zip`에 있습니다. 장치 관리자에 STK500이 없거나 노란 느낌표가 있으면 이 압축을 풀어 설치합니다. 설치 후 포트 번호(이 PC는 COM10)를 확인하고 avrdude 명령의 `-P`에 맞춥니다.
+
+FT232는 별도입니다. FTDI 드라이버가 잡히면 "USB Serial Port"로 보이며, 이 PC에서는 COM11입니다.
+
+## 6. 보드 참고
+
+| 보드 | 역할 |
+| --- | --- |
+| AB-M128Pro-A | 베이스. 12 V 어댑터, 7805(5 V), 포트별 10핀 헤더, 4자리 7세그먼트, LED(PG0/PG1), UART1 핀헤더, ISP |
+| AM-128RAM | CPU 모듈. ATmega128-16AU, 16 MHz 크리스탈, 32 KB SRAM(IS62C256-70). 이 펌웨어는 SRAM을 쓰지 않습니다 |
+
+모듈 헤더의 XTAL 핀(23, 24)은 오픈이라 베이스의 7.3728 MHz 발진은 쓰지 않습니다. 회로와 매뉴얼은 `doc/AB-M128Pro-A`, `doc/AM-128RAM`에 있고, 결합 사진은 `doc/AB-M128Pro-A_AM-128RAM.jpg`입니다.

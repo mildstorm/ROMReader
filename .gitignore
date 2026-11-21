@@ -1,5 +1,8 @@
 # Firmware objects, map, and HEX from `make`
-FreeRTOSStackFinalSerial/FreeRTOS/build/
+RomReader/build/
+
+# Python bytecode
+__pycache__/
 
 # Local avrdude clone (own .git) and its CMake/Ninja build
 avrdude/
