@@ -359,19 +359,19 @@ python tools\romdump.py -p COM11 -t 123 -o rom\HART\U5_82S123.bin
 
 | 칩 | 보드 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/D.bin` | | | |
-| E (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/E.bin` | | | |
-| F (VISION+) | ROM-24 | 24핀, 2732 추정 (표시 판독 불가) | `rom/GODO/F.bin` | | | |
-| 9135N | KEY | 2716 (Fujitsu MB8516) | `rom/GODO/KEY.bin` | | | |
+| D (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/D.bin` | 8192 | `6c0a9315e6181d4923c9e3f0e4ff28de1d2ddb2d` | 2026-11-22, 2회 일치, 불안정 0 |
+| E (VISION+) | ROM-24 | 2764 (TMS 2764-20JL) | `rom/GODO/E.bin` | 8192 | `7f271500e969c18693bff219e83c7e8e60976633` | 2026-11-22, 2회 일치, 불안정 0 |
+| F (VISION+) | ROM-24 | 2732 (24핀, 표시 판독 불가, 덤프로 확인) | `rom/GODO/F.bin` | 4096 | `9f5d41b550cc7be139053c060bc543953fdfe26b` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 앞뒤 4 KB 동일, 벡터 NMI $03FB / RESET $FA62 / IRQ $FA40 |
+| 9135N | KEY | 2716 (Fujitsu MB8516) | `rom/GODO/KEY.bin` | 2048 | `8488b9bbe52ba8bc46f45d618969d611f5c76d04` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 2 KB 네 구간 모두 동일. 내용은 문자 글꼴(@, A, B, C …)로 보임 |
 
 #### Malum
 
 | 칩 | 보드 위치 | 종류 | 파일 | 크기 | SHA-1 | 날짜 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D0 | ROM 1 (D0) | 2732 추정 | `rom/Malum/D0.bin` | | | |
-| E0 | ROM 3 (E0) | 2732 (TMS 2732JL) | `rom/Malum/E0.bin` | | | |
-| F0 | ROM 5 (F0) | 2732 (TMS 2732JL) | `rom/Malum/F0.bin` | | | |
-| Rom1 | KEY BOARD (ROM 7) | 2716 (NEC D2716D) | `rom/Malum/KEY.bin` | | | |
+| D0 | ROM 1 (D0) | 2732 (덤프로 확인) | `rom/Malum/D0.bin` | 4096 | `d17a15868dc875c67061c95ec53a6b2699d3a425` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 앞뒤 4 KB 동일. GODO D의 뒤 4 KB와 같음 |
+| E0 | ROM 3 (E0) | 2732 (TMS 2732JL) | `rom/Malum/E0.bin` | 4096 | `a2fd1223a3ca0cfee24a6afe66ea3c4c144dd98e` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 앞뒤 4 KB 동일. GODO E의 뒤 4 KB와 같음 |
+| F0 | ROM 5 (F0) | 2732 (TMS 2732JL) | `rom/Malum/F0.bin` | 4096 | `908acfba8d3086c5cc27f520b90d9cff7c37ba50` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 앞뒤 4 KB 동일, 벡터 NMI $03FB / RESET $FA62 / IRQ $FA40. GODO F와 8바이트 다름 |
+| Rom1 | KEY BOARD (ROM 7) | 2716 (NEC D2716D) | `rom/Malum/KEY.bin` | 2048 | `7183002d14025a8836ce239e57b809f75affb8aa` | 2026-11-22, 2회 일치, 불안정 0. 8 KB 읽기의 2 KB 네 구간 모두 동일. 내용은 문자 글꼴로 보이며, GODO KEY와 같은 글자 모양이 한 줄씩 밀린 배치 |
 
 ### 터미널 명령
 
