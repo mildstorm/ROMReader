@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZIF 결선도</title>
+<style>
+:root{--bg:#faf9f5;--card:#ffffff;--card2:#f1efe8;--text:#2c2c2a;--muted:#5f5e5a;--faint:#b4b2a9;--border:#d3d1c7;--strong:#888780;--accent:#185FA5;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1e1c;--card:#2a2927;--card2:#252422;--text:#ecebe6;--muted:#b4b2a9;--faint:#5f5e5a;--border:#444441;--strong:#888780;--accent:#85B7EB;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1f1e1c;--card:#2a2927;--card2:#252422;--text:#ecebe6;--muted:#b4b2a9;--faint:#5f5e5a;--border:#444441;--strong:#888780;--accent:#85B7EB;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;font-weight:500;margin:0 0 4px}
+p{margin:0 0 12px;color:var(--muted);font-size:14px}
+button{font:inherit;font-size:14px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:0 0 8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit;font-size:11px;fill:var(--muted)}
+svg .th{font-size:14px;font-weight:500;fill:var(--text)}
+ul{margin:16px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+li{margin:4px 0}
+code{font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>통합 보드 ↔ ZIF 결선도</h1>
+<p>AB-M128Pro-A 베이스 + AM-128RAM 모듈의 헤더 J117, J121, J104와 40핀 ZIF 소켓을 칩 종류별로 잇는 방법입니다. 같은 색 핀끼리 점퍼선 한 가닥으로 연결합니다. 핀에 마우스를 올리면 짝이 선으로 표시됩니다.</p>
+
+<div class="row">
+  <button id="b2764" onclick="show('2764')">2764 (28핀)</button>
+  <button id="b82S129" onclick="show('82S129')">82S129 (16핀)</button>
+  <button id="b82S123" onclick="show('82S123')">82S123 (16핀)</button>
+  <span id="cnt" style="font-size:13px;color:var(--muted);margin-left:6px"></span>
+</div>
+<div class="legend">
+  <span><span class="sw" style="background:#378ADD"></span>주소</span>
+  <span><span class="sw" style="background:#BA7517"></span>/CE, /OE</span>
+  <span><span class="sw" style="background:#1D9E75"></span>데이터</span>
+  <span><span class="sw" style="background:#E24B4A"></span>5 V</span>
+  <span><span class="sw" style="background:#888780"></span>GND</span>
+  <span>점선 칸 = 연결 안 함</span>
+</div>
+
+<svg id="sv" viewBox="0 0 680 570" role="img" aria-label="보드 헤더와 ZIF 소켓 결선"><g id="g"></g><g id="hl"></g></svg>
+
+<ul>
+  <li>헤더 칸 <code>3 PB2 · ZIF 8 A2</code> = J117 3번 핀(PB2)을 ZIF 8번 다리에 연결, 칩 신호는 A2.</li>
+  <li>ZIF 번호: 레버를 위로 놓고 왼쪽 줄 맨 위가 1번, 왼쪽 줄 아래로 20번, 오른쪽 줄 맨 아래 21번, 맨 위 40번. 칩은 노치를 레버 쪽으로, 위쪽으로 붙여 꽂습니다.</li>
+  <li>헤더는 1–8번이 Px0–Px7, 9번 5 V, 10번 GND입니다. 헤더 핀 하나에는 점퍼 하나만 꽂습니다.</li>
+  <li>82S129의 /CE2(ZIF 38)는 GND(J121-10)에 고정합니다. /CE1만으로 칩을 켜고 끕니다.</li>
+  <li>점퍼와 칩은 보드 전원을 끄고(S104 OFF) 꽂습니다. 칩 종류를 바꾸면 점퍼를 모두 다시 꽂고 그 칩용 펌웨어(<code>RomReader_칩.hex</code>)를 플래시합니다.</li>
+  <li>82S129와 82S123은 같은 16핀이지만 결선이 다릅니다. 다른 결선에 꽂으면 칩이나 MCU가 상할 수 있습니다.</li>
+</ul>
+</main>
+<script>
+const C={a:'#378ADD',c:'#BA7517',d:'#1D9E75',p:'#E24B4A',g:'#888780'};
+const W={
+'2764':{rows:14,list:[
+['J117',1,10,'A0','a'],['J117',2,9,'A1','a'],['J117',3,8,'A2','a'],['J117',4,7,'A3','a'],['J117',5,6,'A4','a'],['J117',6,5,'A5','a'],['J117',7,4,'A6','a'],['J117',8,3,'A7','a'],['J117',9,1,'VPP','p'],
+['J121',1,37,'A8','a'],['J121',2,36,'A9','a'],['J121',3,33,'A10','a'],['J121',4,35,'A11','a'],['J121',5,2,'A12','a'],['J121',6,32,'/CE','c'],['J121',7,34,'/OE','c'],['J121',9,40,'VCC','p'],['J121',10,14,'GND','g'],
+['J104',1,11,'O0','d'],['J104',2,12,'O1','d'],['J104',3,13,'O2','d'],['J104',4,27,'O3','d'],['J104',5,28,'O4','d'],['J104',6,29,'O5','d'],['J104',7,30,'O6','d'],['J104',8,31,'O7','d'],['J104',9,39,'/PGM','p']]},
+'82S129':{rows:8,list:[
+['J117',1,5,'A0','a'],['J117',2,6,'A1','a'],['J117',3,7,'A2','a'],['J117',4,4,'A3','a'],['J117',5,3,'A4','a'],['J117',6,2,'A5','a'],['J117',7,1,'A6','a'],['J117',8,39,'A7','a'],['J117',9,40,'VCC','p'],['J117',10,8,'GND','g'],
+['J121',6,37,'/CE1','c'],['J121',10,38,'/CE2','g'],
+['J104',1,36,'O1','d'],['J104',2,35,'O2','d'],['J104',3,34,'O3','d'],['J104',4,33,'O4','d']]},
+'82S123':{rows:8,list:[
+['J117',1,34,'A0','a'],['J117',2,35,'A1','a'],['J117',3,36,'A2','a'],['J117',4,37,'A3','a'],['J117',5,38,'A4','a'],['J117',9,40,'VCC','p'],['J117',10,8,'GND','g'],
+['J121',6,39,'/CE','c'],
+['J104',1,1,'O1','d'],['J104',2,2,'O2','d'],['J104',3,3,'O3','d'],['J104',4,4,'O4','d'],['J104',5,5,'O5','d'],['J104',6,6,'O6','d'],['J104',7,7,'O7','d'],['J104',8,33,'O8','d']]}};
+const HD=[['J117','PORTB','PB',62],['J121','PORTC','PC',222],['J104','PORTF','PF',382]];
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+let pos={};
+function zy(z){const r=z<=20?z:41-z;return 72+(r-1)*24;}
+function zx(z){return z<=20?490:550;}
+function show(chip){
+  const g=document.getElementById('g');g.innerHTML='';un();pos={};
+  for(const k in W)document.getElementById('b'+k).setAttribute('aria-pressed',k===chip);
+  const w=W[chip];document.getElementById('cnt').textContent='점퍼 '+w.list.length+'가닥';
+  const byH={},byZ={};w.list.forEach(r=>{byH[r[0]+'-'+r[1]]=r;byZ[r[2]]=r;});
+  g.appendChild(el('rect',{x:12,y:28,width:330,height:520,rx:16,fill:'none',stroke:'var(--strong)','stroke-width':0.5,'stroke-dasharray':'4 3'}));
+  g.appendChild(el('text',{class:'th',x:28,y:48},'ATmega128 통합 보드 (베이스 헤더)'));
+  HD.forEach(([h,port,px,y0])=>{
+    g.appendChild(el('rect',{x:24,y:y0,width:306,height:148,rx:8,fill:'var(--card2)',stroke:'var(--border)','stroke-width':0.5}));
+    g.appendChild(el('text',{class:'th',x:36,y:y0+20},h+'  '+port));
+    for(let p=1;p<=10;p++){
+      const col=(p-1)%2,row=Math.floor((p-1)/2),x=34+col*148,y=y0+32+row*22;
+      const sig=p===9?'5V':p===10?'GND':px+(p-1),r=byH[h+'-'+p];
+      const gg=el('g',{});
+      gg.appendChild(el('rect',{x:x,y:y,width:140,height:19,rx:4,fill:r?'var(--card)':'none',stroke:r?C[r[4]]:'var(--border)','stroke-width':r?1:0.5,'stroke-dasharray':r?'':'3 3'}));
+      gg.appendChild(el('text',{x:x+6,y:y+13},p+' '+sig));
+      gg.appendChild(el('text',{x:x+134,y:y+13,'text-anchor':'end',style:'fill:'+(r?C[r[4]]:'var(--faint)')},r?'ZIF '+r[2]+' '+r[3]:'—'));
+      if(r){pos[r[0]+'-'+r[1]]=[x+140,y+9];gg.onmouseenter=()=>hi(r);gg.onmouseleave=un;}
+      g.appendChild(gg);
+    }
+  });
+  g.appendChild(el('rect',{x:478,y:30,width:84,height:530,rx:8,fill:'var(--card2)',stroke:'var(--strong)','stroke-width':0.5}));
+  g.appendChild(el('rect',{x:500,y:34,width:40,height:10,rx:3,fill:'var(--strong)'}));
+  g.appendChild(el('text',{x:520,y:24,'text-anchor':'middle'},'레버 쪽'));
+  const cy0=zy(1)-10,cy1=zy(w.rows)+10;
+  g.appendChild(el('rect',{x:484,y:cy0,width:72,height:cy1-cy0,rx:4,fill:'none',stroke:'var(--muted)','stroke-width':1}));
+  g.appendChild(el('path',{d:'M512 '+cy0+' A8 8 0 0 0 528 '+cy0,fill:'none',stroke:'var(--muted)','stroke-width':1}));
+  g.appendChild(el('text',{x:520,y:(cy0+cy1)/2,'text-anchor':'middle','dominant-baseline':'central'},chip));
+  for(let z=1;z<=40;z++){
+    const x=zx(z),y=zy(z),r=byZ[z],left=z<=20,gg=el('g',{});
+    gg.appendChild(el('circle',{cx:x,cy:y,r:4,fill:r?C[r[4]]:'none',stroke:r?C[r[4]]:'var(--strong)','stroke-width':0.8}));
+    gg.appendChild(el('text',{x:left?x+9:x-9,y:y+4,'text-anchor':left?'start':'end'},z));
+    if(r){
+      gg.appendChild(el('text',{x:left?470:570,y:y+4,'text-anchor':left?'end':'start',style:'fill:'+C[r[4]]},left?r[3]+' ← '+r[0]+'-'+r[1]:r[0]+'-'+r[1]+' → '+r[3]));
+      pos['Z'+z]=[x,y];gg.onmouseenter=()=>hi(r);gg.onmouseleave=un;
+    }
+    g.appendChild(gg);
+  }
+}
+function hi(r){
+  const a=pos[r[0]+'-'+r[1]],b=pos['Z'+r[2]],h=document.getElementById('hl');h.innerHTML='';
+  const d=b[0]<520?'M'+a[0]+' '+a[1]+' L400 '+a[1]+' L400 '+b[1]+' L'+b[0]+' '+b[1]
+                  :'M'+a[0]+' '+a[1]+' L400 '+a[1]+' L400 22 L600 22 L600 '+b[1]+' L'+b[0]+' '+b[1];
+  h.appendChild(el('path',{d:d,fill:'none',stroke:C[r[4]],'stroke-width':2}));
+}
+function un(){document.getElementById('hl').innerHTML='';}
+show('2764');
+</script>
+</body>
+</html>
