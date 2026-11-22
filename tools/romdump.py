@@ -80,6 +80,8 @@ def main():
     ap.add_argument("-n", "--reads", type=int, default=2, help="full reads to compare (default 2)")
     ap.add_argument("-b", "--baud", type=int, default=38400)
     ap.add_argument("--force", action="store_true", help="overwrite an existing file")
+    ap.add_argument("--allow-blank", action="store_true",
+                    help="save even if every byte is the same (truly blank chip)")
     args = ap.parse_args()
 
     kind = ALIASES.get(args.type.lower())
@@ -110,12 +112,32 @@ def main():
         dumps = []
         for i in range(args.reads):
             t0 = time.time()
-            text = command(ser, "dump", timeout=5.0)
-            data, status = parse_ihex(text, size)
+            # A garbled serial line fails the per-line checksum; read again
+            # (the reads are still compared below, so a bad read never lands).
+            for attempt in range(1, 6):
+                try:
+                    text = command(ser, "dump", timeout=5.0)
+                    data, status = parse_ihex(text, size)
+                    break
+                except (ValueError, TimeoutError) as e:
+                    print(f"  read {i + 1}: attempt {attempt} failed ({e}); retrying")
+                    time.sleep(0.5)
+                    ser.reset_input_buffer()
+                    ser.write(b"info\r")
+                    try:
+                        wait_prompt(ser)
+                    except TimeoutError:
+                        pass
+            else:
+                sys.exit("serial data kept failing: check FT232 GND/RX/TX and add 0.1 uF "
+                         "between ZIF VCC and GND. Nothing written.")
             for s in status:
                 print(f"  read {i + 1}: {s}")
             if any(s.startswith("# UNSTABLE") and s != "# UNSTABLE 0" for s in status):
                 sys.exit("unstable bits: reseat the chip and check wires. Nothing written.")
+            if not args.allow_blank and any(s.startswith("# WARN every byte") for s in status):
+                sys.exit("every byte is the same value: no chip, no chip power, or /CE not "
+                         "wired. Nothing written (use --allow-blank for a truly blank chip).")
             print(f"  read {i + 1}: {len(data)} bytes, {time.time() - t0:.1f} s, "
                   f"SHA-1 {hashlib.sha1(data).hexdigest()}")
             dumps.append(data)

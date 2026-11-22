@@ -201,9 +201,16 @@ static uint8_t sample(uint16_t a)
     return PINF;
 }
 
-/* Read READS_PER_ADDR times, return the first value; *stable = 0 on mismatch. */
+/*
+ * Read READS_PER_ADDR times, return the first value; *stable = 0 on mismatch.
+ * One settling sample is thrown away first: over long jumpers a bipolar
+ * PROM output (82S129) was still moving on the first 2 us sample after an
+ * address change.
+ */
 static uint8_t read_byte(uint16_t a, uint8_t *stable)
 {
+    (void)sample(a);
+    _delay_us(20);
     uint8_t v = sample(a);
     for (uint8_t i = 1; i < READS_PER_ADDR; i++) {
         if (sample(a) != v)
@@ -254,12 +261,15 @@ static void cmd_dump(void)
     print_chip();
     put_nl();
 
-    chip_enable(1);
     for (uint16_t base = 0; base < c->size; base += 16) {
         uint8_t n = (c->size - base) < 16 ? (uint8_t)(c->size - base) : 16;
         uint8_t buf[16];
         uint8_t sum = n + (uint8_t)(base >> 8) + (uint8_t)base;
 
+        /* Enable the chip only while sampling, not while the UART sends:
+         * bipolar PROMs (82S129/82S123) draw heavy current with the outputs
+         * on, and that disturbed the serial output over long jumpers. */
+        chip_enable(1);
         for (uint8_t i = 0; i < n; i++) {
             uint8_t ok = 1;
             uint8_t v = read_byte(base + i, &ok) & c->mask;
@@ -273,6 +283,8 @@ static void cmd_dump(void)
             buf[i] = v;
             sum += v;
         }
+        chip_enable(0);
+        set_addr(0);
 
         uart_putc(':');
         put_hex8(n);
@@ -313,17 +325,23 @@ static void cmd_hex(uint16_t start, uint16_t len)
     if (len == 0 || (uint32_t)start + len > c->size)
         len = c->size - start;
 
-    chip_enable(1);
     for (uint16_t a = start; a < start + len; a += 16) {
+        uint8_t row[16], okr[16];
+        uint8_t n = (start + len - a) < 16 ? (uint8_t)(start + len - a) : 16;
+        /* Sample the whole row with the chip on, then print with it off
+         * (same reason as in cmd_dump). */
+        chip_enable(1);
+        for (uint8_t i = 0; i < n; i++) {
+            okr[i] = 1;
+            row[i] = read_byte(a + i, &okr[i]) & c->mask;
+        }
+        chip_enable(0);
+        set_addr(0);
         put_hex16(a);
         PUTS(": ");
-        uint8_t row[16];
-        uint8_t n = (start + len - a) < 16 ? (uint8_t)(start + len - a) : 16;
         for (uint8_t i = 0; i < n; i++) {
-            uint8_t ok = 1;
-            row[i] = read_byte(a + i, &ok) & c->mask;
             put_hex8(row[i]);
-            uart_putc(ok ? ' ' : '?');
+            uart_putc(okr[i] ? ' ' : '?');
         }
         PUTS(" |");
         for (uint8_t i = 0; i < n; i++)
