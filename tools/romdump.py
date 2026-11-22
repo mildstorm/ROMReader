@@ -82,6 +82,10 @@ def main():
     ap.add_argument("--force", action="store_true", help="overwrite an existing file")
     ap.add_argument("--allow-blank", action="store_true",
                     help="save even if every byte is the same (truly blank chip)")
+    ap.add_argument("--vote", action="store_true",
+                    help="for a chip with a marginal bit: read -n times, keep the majority "
+                         "value per address, and list every address that was not unanimous "
+                         "in <out>.marginal.txt")
     args = ap.parse_args()
 
     kind = ALIASES.get(args.type.lower())
@@ -133,7 +137,8 @@ def main():
                          "between ZIF VCC and GND. Nothing written.")
             for s in status:
                 print(f"  read {i + 1}: {s}")
-            if any(s.startswith("# UNSTABLE") and s != "# UNSTABLE 0" for s in status):
+            if not args.vote and any(s.startswith("# UNSTABLE") and s != "# UNSTABLE 0"
+                                     for s in status):
                 sys.exit("unstable bits: reseat the chip and check wires. Nothing written.")
             if not args.allow_blank and any(s.startswith("# WARN every byte") for s in status):
                 sys.exit("every byte is the same value: no chip, no chip power, or /CE not "
@@ -141,6 +146,29 @@ def main():
             print(f"  read {i + 1}: {len(data)} bytes, {time.time() - t0:.1f} s, "
                   f"SHA-1 {hashlib.sha1(data).hexdigest()}")
             dumps.append(data)
+
+    if args.vote:
+        from collections import Counter
+        out = bytearray(size)
+        notes = []
+        for a in range(size):
+            c = Counter(d[a] for d in dumps)
+            v, n = c.most_common(1)[0]
+            out[a] = v
+            if n != len(dumps):
+                notes.append(f"0x{a:04X}: kept 0x{v:02X} ({n}/{len(dumps)}), seen "
+                             + ", ".join(f"0x{x:02X} x{k}" for x, k in sorted(c.items())))
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+        with open(args.out, "wb") as f:
+            f.write(out)
+        with open(args.out + ".marginal.txt", "w", encoding="utf-8") as f:
+            f.write(f"{len(dumps)} reads, majority per address. Not unanimous:\n")
+            f.write("\n".join(notes) + ("\n" if notes else "(none)\n"))
+        print(f"wrote {args.out}: {size} bytes, SHA-1 {hashlib.sha1(out).hexdigest()}, "
+              f"majority of {len(dumps)} reads; {len(notes)} address(es) not unanimous")
+        for line in notes:
+            print("  " + line)
+        return
 
     first = dumps[0]
     for i, d in enumerate(dumps[1:], start=2):
