@@ -49,15 +49,42 @@ typedef struct {
     uint8_t mask;       /* valid data bits */
 } chip_t;
 
+/*
+ * ZIF pin of every wired MCU line, for the `wires` check (README section 2).
+ * line 0-12 = A0-A12 (PB0-PB7, PC0-PC4), LINE_CE = /CE (PC5), LINE_OE = /OE
+ * (PC6). data_zif[n] = ZIF pin of data bit n (PFn).
+ */
+#define LINE_CE 13
+#define LINE_OE 14
+
+typedef struct {
+    uint8_t line;
+    uint8_t zif;
+} wire_t;
+
 #if defined(CHIP_2764)
 static const char chip_name[] PROGMEM = "2764";
 static const chip_t chip = { chip_name, 8192, 0xFF };
+static const wire_t addr_wires[] PROGMEM = {
+    {0, 10}, {1, 9}, {2, 8}, {3, 7}, {4, 6}, {5, 5}, {6, 4}, {7, 3},
+    {8, 37}, {9, 36}, {10, 33}, {11, 35}, {12, 2}, {LINE_CE, 32}, {LINE_OE, 34},
+};
+static const uint8_t data_zif[] PROGMEM = { 11, 12, 13, 27, 28, 29, 30, 31 };
 #elif defined(CHIP_82S129)
 static const char chip_name[] PROGMEM = "82S129";
 static const chip_t chip = { chip_name, 256, 0x0F };
+/* Not in order on the chip: A0-A2 are pins 5-7, A3-A6 pins 4-1, A7 pin 15. */
+static const wire_t addr_wires[] PROGMEM = {
+    {0, 5}, {1, 6}, {2, 7}, {3, 4}, {4, 3}, {5, 2}, {6, 1}, {7, 39}, {LINE_CE, 37},
+};
+static const uint8_t data_zif[] PROGMEM = { 36, 35, 34, 33 };
 #elif defined(CHIP_82S123)
 static const char chip_name[] PROGMEM = "82S123";
 static const chip_t chip = { chip_name, 32, 0xFF };
+static const wire_t addr_wires[] PROGMEM = {
+    {0, 34}, {1, 35}, {2, 36}, {3, 37}, {4, 38}, {LINE_CE, 39},
+};
+static const uint8_t data_zif[] PROGMEM = { 1, 2, 3, 4, 5, 6, 7, 33 };
 #else
 #error "build with CHIP=2764, CHIP=82S129 or CHIP=82S123"
 #endif
@@ -243,6 +270,7 @@ static void cmd_help(void)
          "  hex [addr] [len]    hex view (hex numbers)\r\n"
          "  peek <addr>         one address\r\n"
          "  check               chip present / outputs driven test\r\n"
+         "  wires               jumper check, chip OUT: one line at a time\r\n"
          "  help\r\n");
 }
 
@@ -398,6 +426,111 @@ static void cmd_check(void)
         PUTS("# OK all data bits toggle\r\n");
 }
 
+/*
+ * Jumper check with the chip OUT of the ZIF (no chip output can fight the
+ * MCU). A swapped or shifted jumper gives a dump whose every read matches
+ * but whose bytes sit at the wrong addresses (HART U36, doc/troubleshooting.md),
+ * so repeat reads cannot catch it; this can.
+ *
+ * Address lines: one MCU line at a time is set to its active level and the
+ * reader names the ZIF pin where the meter should see it. Enter = next.
+ * Data lines: the user touches each data ZIF pin to GND with a jumper; the
+ * pull-up input that goes Low is named with the ZIF pin it must be.
+ */
+static uint8_t uart_poll(char *ch)
+{
+    if (!(UCSR1A & (1 << RXC1)))
+        return 0;
+    *ch = (char)UDR1;
+    return 1;
+}
+
+static void cmd_wires(void)
+{
+    const uint8_t n_addr = sizeof(addr_wires) / sizeof(addr_wires[0]);
+    const uint8_t n_data = sizeof(data_zif);
+    char ch = 0;
+
+    PUTS("# wiring check for ");
+    puts_P_(cur()->name);
+    PUTS(". Take the chip OUT of the ZIF first.\r\n"
+         "# Meter: black on GND, red on the ZIF pin named. Enter = next, q = quit\r\n");
+
+    for (uint8_t i = 0; i < n_addr; i++) {
+        uint8_t line = pgm_read_byte(&addr_wires[i].line);
+        uint8_t zif = pgm_read_byte(&addr_wires[i].zif);
+
+        chip_enable(0);
+        if (line < LINE_CE) {
+            set_addr((uint16_t)1 << line);
+            uart_putc('A');
+            put_dec(line);
+            PUTS(" -> ZIF ");
+            put_dec(zif);
+            PUTS(": 5 V there, 0 V on every other address ZIF pin");
+        } else {
+            set_addr(0);
+            PORTC &= (uint8_t)~(1 << (line == LINE_CE ? CE_BIT : OE_BIT));
+            if (line == LINE_CE)
+                PUTS("/CE");
+            else
+                PUTS("/OE");
+            PUTS(" -> ZIF ");
+            put_dec(zif);
+            PUTS(": 0 V there (5 V when idle)");
+        }
+        PUTS("  [Enter/q] ");
+        ch = uart_getc();
+        put_nl();
+        if (ch == 'q' || ch == 'Q')
+            break;
+    }
+    set_addr(0);
+    chip_enable(0);
+    if (ch == 'q' || ch == 'Q')
+        return;
+
+    PUTS("# Data lines: touch each data ZIF pin to GND with a jumper. q = quit\r\n#  expect");
+    for (uint8_t b = 0; b < n_data; b++) {
+        PUTS(" D");
+        put_dec(b);
+        PUTS("=ZIF ");
+        put_dec(pgm_read_byte(&data_zif[b]));
+    }
+    put_nl();
+
+    const uint8_t mask = cur()->mask;
+    uint8_t last = 0;
+    for (;;) {
+        if (uart_poll(&ch) && (ch == 'q' || ch == 'Q'))
+            break;
+        uint8_t low = (uint8_t)~PINF & mask;
+        if (low != last) {
+            _delay_ms(20);                          /* let the jumper settle */
+            low = (uint8_t)~PINF & mask;
+        }
+        if (low != last) {
+            uint8_t count = 0;
+            for (uint8_t b = 0; b < 8; b++) {
+                if ((low >> b) & 1) {
+                    count++;
+                    if (!((last >> b) & 1)) {
+                        PUTS("D");
+                        put_dec(b);
+                        PUTS(" low -> this must be ZIF ");
+                        put_dec(pgm_read_byte(&data_zif[b]));
+                        put_nl();
+                    }
+                }
+            }
+            if (count > 1)
+                PUTS("# WARN several data bits low at once: shorted jumpers?\r\n");
+            last = low;
+        }
+    }
+    PUTS("# wiring check done\r\n");
+}
+
 /* ---------- line input ---------- */
 
 static uint8_t read_line(char *buf, uint8_t max)
@@ -484,6 +617,8 @@ int main(void)
             }
         } else if (!strcmp_P(cmd, PSTR("check")))
             cmd_check();
+        else if (!strcmp_P(cmd, PSTR("wires")))
+            cmd_wires();
         else
             PUTS("ERR unknown command, type help\r\n");
         led_busy(0);
